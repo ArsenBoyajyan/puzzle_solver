@@ -1,5 +1,48 @@
 #include <vector>
 #include <string>
+#include <iostream>
+#include <unordered_set>
+#include <queue>
+
+// Each possible permutation of figures is represented as a node of a graph
+struct position {
+    std::vector<std::string> grid;
+    position* up = nullptr;
+    position* down = nullptr;
+    position* left = nullptr;
+    position* right = nullptr;
+    position* parent = nullptr;
+
+    enum RELATION {
+        ROOT,
+        UP,
+        DOWN,
+        LEFT,
+        RIGHT
+    };
+    RELATION relation = ROOT;
+
+    position& operator=(const position& other) {
+        if (this != &other) {
+            grid = other.grid;
+            up = other.up;
+            down = other.down;
+            left = other.left;
+            right = other.right;
+            parent = other.parent;
+            relation = other.relation;
+        }
+        return *this;
+    }
+};
+
+void get_up(position& p);
+void get_down(position& p);
+void get_left(position& p);
+void get_right(position& p);
+bool check_invalide(std::vector<std::string> &grid);
+bool check_goal(std::vector<std::string> &grid);
+
 
 /**
  * @brief  Read your map from stdin
@@ -7,7 +50,14 @@
  * @param  &grid: You should first resize the grid! Modify it inplace.
  * @retval None
  */
-void read_map(std::vector<std::string> &grid);
+void read_map(std::vector<std::string> &grid) {
+    int n, m;
+    std::cin >> n >> m;
+    grid.resize(n, std::string(m, ' '));
+    for (int i = 0; i < n; ++i) {
+        std::cin >> grid[i];
+    }
+}
 
 /**
  * @brief  Solve the sokoban described by the grid
@@ -15,7 +65,78 @@ void read_map(std::vector<std::string> &grid);
  * @param  &grid: The grid you read by `read_map'
  * @retval 
  */
-std::string solve(std::vector<std::string> &grid);
+std::string solve(std::vector<std::string> &grid){
+    if (check_invalide(grid)) {
+        return "No solution!";
+    }
+
+    position root;
+    root.grid = grid;
+
+    std::queue<position> q;
+    q.push(root);
+
+    struct GridHash {
+        size_t operator()(const std::vector<std::string>& grid) const {
+            size_t seed = 0;
+            for (const auto& row : grid) {
+                for (char c : row) {
+                    seed ^= std::hash<char>{}(c) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+                }
+            }
+            return seed;
+        }
+    };
+    std::unordered_set<std::vector<std::string>, GridHash> visited;
+    
+    visited.insert(root.grid);
+
+
+    while (!q.empty()) {
+        position p = q.front();
+        q.pop();
+
+        if (check_goal(p.grid)) {
+            std::string ans;
+            while (p.relation != position::ROOT) {
+                ans += p.relation == position::UP ? "U" : p.relation == position::DOWN ? "D" : p.relation == position::LEFT ? "L" : "R";
+                p = *p.parent;
+            }
+            return ans;
+        }
+
+        get_up(p);
+        get_down(p);
+        get_left(p);
+        get_right(p);
+        if (p.up != nullptr) {
+            if (visited.find(p.up->grid) == visited.end()) {
+                q.push(*p.up);
+                visited.insert(p.up->grid);
+            }
+        }
+        if (p.down != nullptr) {
+            if (visited.find(p.down->grid) == visited.end()) {
+                q.push(*p.down);
+                visited.insert(p.down->grid);
+            }
+        }
+        if (p.left != nullptr) {
+            if (visited.find(p.left->grid) == visited.end()) {
+                q.push(*p.left);
+                visited.insert(p.left->grid);
+            }
+        }
+        if (p.right != nullptr) {
+            if (visited.find(p.right->grid) == visited.end()) {
+                q.push(*p.right);
+                visited.insert(p.right->grid);
+            }
+        }
+    }
+    
+    return "";
+}
 
 // For big cases, paste your answers here (i.e. replace "ans for big 1" with your answer)
 // Do not remove the first element, it should be left blank.
@@ -42,3 +163,267 @@ std::string print_answer(int index) {
     }
     return answers[(size_t)index];
 }
+
+bool check_invalide(std::vector<std::string> &grid) {
+    // Check if there's a box surrounded by walls or other boxes in a way that makes it immovable
+    for (size_t i = 1; i < grid.size(); ++i) {
+        for (size_t j = 1; j < grid[i].size(); ++j) {
+            if (grid[i][j] == 'B') {
+                bool is_surrounded = true;
+                if (grid[i-1][j] != '#' && grid[i-1][j] != 'B') is_surrounded = false;
+                if (grid[i+1][j] != '#' && grid[i+1][j] != 'B') is_surrounded = false;
+                if (grid[i][j-1] != '#' && grid[i][j-1] != 'B') is_surrounded = false;
+                if (grid[i][j+1] != '#' && grid[i][j+1] != 'B') is_surrounded = false;
+                if (is_surrounded) return true;
+            }
+        }
+    }
+
+    // Check if There are more boxes than target positions
+    int boxes = 0, targets = 0;
+    for (const auto& row : grid) {
+        for (char c : row) {
+            if (c == 'B') ++boxes;
+            if (c == 'T') ++targets;
+        }
+    }
+    if (boxes > targets) return true;
+
+    // Check if there are more then one start position (character s)
+    int start = 0;
+    for (const auto& row : grid) {
+        for (char c : row) {
+            if (c == 's') ++start;
+        }
+    }
+    if (start > 1) return true;
+
+    // Check if Any box is placed in a corner or against a wall where it has no path to the target position
+    // TODO this is a bit tricky, need to think about it
+
+    return false;
+}
+
+void get_up(position& p){
+    position result;
+    result.relation = position::UP;
+    result.grid = p.grid;
+    for (size_t i = 1; i < p.grid.size(); ++i) {
+        for (size_t j = 0; j < p.grid[i].size(); ++j) {
+            if (p.grid[i][j] == 's' || p.grid[i][j] == 'S') {
+                switch (p.grid[i-1][j]){
+                    case '#': // wall
+                        p.up = nullptr;
+                        // delete &result;
+                        return;
+                    case 'B': // box
+                    case 'R':
+                        if (p.grid[i-2][j] == '#' || p.grid[i-2][j] == 'B') { // wall or box behind the box
+                            p.up = nullptr; 
+                            // delete &result;
+                            return;
+                        } else if (p.grid[i-2][j] == 'T'){ // target behind the box
+                            result.grid[i-2][j] = 'R';
+                            result.grid[i-1][j] = (p.grid[i-1][j] == 'R') ? 'S' : 's';
+                            result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
+                            p.up = &result;
+                            result.parent = &p;
+                            return;
+                        } else { // box pushed
+                            result.grid[i-2][j] = 'B';
+                            result.grid[i-1][j] = (p.grid[i-1][j] == 'T') ? 's' : 'S';
+                            result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
+                            p.up = &result;
+                            result.parent = &p;
+                            return;
+                        }    
+                    case 'T':
+                        result.grid[i-1][j] = 'S';
+                        result.grid[i][j] = '.';
+                        p.up = &result;
+                        result.parent = &p;
+                        break;
+                    case '.':
+                        result.grid[i-1][j] = 's';
+                        result.grid[i][j] = '.';
+                        p.up = &result;
+                        result.parent = &p;
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+    }
+}
+
+void get_down(position& p){
+    position result;
+    result.relation = position::DOWN;
+    result.grid = p.grid;
+    for (size_t i = 1; i < p.grid.size(); ++i) {
+        for (size_t j = 0; j < p.grid[i].size(); ++j) {
+            if (p.grid[i][j] == 's' || p.grid[i][j] == 'S') {
+                switch (p.grid[i+1][j]){
+                    case '#': // wall
+                        p.down = nullptr;
+                        // delete &result;
+                        return;
+                    case 'B': // box
+                    case 'R':
+                        if (p.grid[i+2][j] == '#' || p.grid[i+2][j] == 'B') { // wall or box behind the box
+                            p.down = nullptr; 
+                            // delete &result;
+                            return;
+                        } else if (p.grid[i+2][j] == 'T'){ // target behind the box
+                            result.grid[i+2][j] = 'R';
+                            result.grid[i+1][j] = (p.grid[i+1][j] == 'R') ? 'S' : 's';
+                            result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
+                            p.down = &result;
+                            result.parent = &p;
+                            return;
+                        } else { // box pushed
+                            result.grid[i+2][j] = 'B';
+                            result.grid[i+1][j] = (p.grid[i+1][j] == 'T') ? 's' : 'S';
+                            result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
+                            p.down = &result;
+                            result.parent = &p;
+                            return;
+                        }    
+                    case 'T':
+                        result.grid[i+1][j] = 'S';
+                        result.grid[i][j] = '.';
+                        p.down = &result;
+                        result.parent = &p;
+                        break;    
+                    case '.':
+                        result.grid[i+1][j] = 's';
+                        result.grid[i][j] = '.';
+                        p.down = &result;
+                        result.parent = &p;
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+    }
+}
+
+void get_left(position& p){
+    position result;
+    result.relation = position::LEFT;
+    result.grid = p.grid;
+    for (size_t i = 1; i < p.grid.size(); ++i) {
+        for (size_t j = 0; j < p.grid[i].size(); ++j) {
+            if (p.grid[i][j] == 's' || p.grid[i][j] == 'S') {
+                switch (p.grid[i][j-1]){
+                    case '#': // wall
+                        p.left = nullptr;
+                        // delete &result;
+                        return;
+                    case 'B': // box
+                    case 'R':
+                        if (p.grid[i][j-2] == '#' || p.grid[i][j-2] == 'B') { // wall or box behind the box
+                            p.left = nullptr; 
+                            // delete &result;
+                            return;
+                        } else if (p.grid[i][j-2] == 'T'){ // target behind the box
+                            result.grid[i][j-2] = 'R';
+                            result.grid[i][j-1] = (p.grid[i][j-1] == 'R') ? 'S' : 's';  
+                            result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
+                            p.left = &result;
+                            result.parent = &p;
+                            return;
+                        } else { // box pushed
+                            result.grid[i][j-2] = 'B';
+                            result.grid[i][j-1] = (p.grid[i][j-1] == 'T') ? 's' : 'S';
+                            result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
+                            p.left = &result;
+                            result.parent = &p;
+                            return;
+                        }    
+                    case 'T':
+                        result.grid[i][j-1] = 'S';
+                        result.grid[i][j] = '.';
+                        p.left = &result;
+                        result.parent = &p;
+                        break;
+                    case '.':
+                        result.grid[i][j-1] = 's';
+                        result.grid[i][j] = '.';
+                        p.left = &result;
+                        result.parent = &p;
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+    }
+}
+
+void get_right(position& p){
+    position result;
+    result.relation = position::RIGHT;
+    result.grid = p.grid;
+    for (size_t i = 1; i < p.grid.size(); ++i) {
+        for (size_t j = 0; j < p.grid[i].size(); ++j) {
+            if (p.grid[i][j] == 's' || p.grid[i][j] == 'S') {
+                switch (p.grid[i][j+1]){
+                    case '#': // wall
+                        p.right = nullptr;
+                        // delete &result;
+                        return;
+                    case 'B': // box
+                    case 'R':
+                        if (p.grid[i][j+2] == '#' || p.grid[i][j+2] == 'B') { // wall or box behind the box
+                            p.right = nullptr; 
+                            // delete &result;
+                            return;
+                        } else if (p.grid[i][j+2] == 'T'){ // target behind the box
+                            result.grid[i][j+2] = 'R';
+                            result.grid[i][j+1] = (p.grid[i][j+1] == 'R') ? 'S' : 's';
+                            result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
+                            p.right = &result;
+                            result.parent = &p;
+                            return;
+                        } else { // box pushed
+                            result.grid[i][j+2] = 'B';
+                            result.grid[i][j+1] = (p.grid[i][j+1] == 'T') ? 's' : 'S';
+                            result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
+                            p.right = &result;
+                            result.parent = &p;
+                            return;
+                        }    
+                    case 'T':
+                        result.grid[i][j+1] = 'S';
+                        result.grid[i][j] = '.';
+                        p.right = &result;
+                        result.parent = &p;
+                        break;
+                    case '.':
+                        result.grid[i][j+1] = 's';
+                        result.grid[i][j] = '.';
+                        p.right = &result;
+                        result.parent = &p;
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+    }
+}
+
+bool check_solved(std::vector<std::string> &grid) {
+    for (size_t i = 1; i < grid.size(); ++i) {
+        for (size_t j = 0; j < grid[i].size(); ++j) {
+            if (grid[i][j] == 'T' || grid[i][j] == 'B') {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+    
