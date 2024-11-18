@@ -23,25 +23,23 @@ struct position {
     RELATION relation = ROOT;
 
     position& operator=(const position& other) {
-        if (this != &other) {
-            grid = other.grid;
-            up = other.up;
-            down = other.down;
-            left = other.left;
-            right = other.right;
-            parent = other.parent;
-            relation = other.relation;
-        }
+        grid = other.grid; 
+        up = other.up;
+        down = other.down;
+        left = other.left;
+        right = other.right;
+        parent = other.parent;
+        relation = other.relation;
         return *this;
     }
 };
 
-void get_up(position& p);
-void get_down(position& p);
-void get_left(position& p);
-void get_right(position& p);
+void get_up(position& p, position& result);
+void get_down(position& p, position& result);
+void get_left(position& p, position& result);
+void get_right(position& p, position& result);
 bool check_invalide(std::vector<std::string> &grid);
-bool check_goal(std::vector<std::string> &grid);
+bool check_solved(std::vector<std::string> &grid);
 
 
 /**
@@ -52,7 +50,7 @@ bool check_goal(std::vector<std::string> &grid);
  */
 void read_map(std::vector<std::string> &grid) {
     int n, m;
-    std::cin >> n >> m;
+    std::cin >> m >> n;
     grid.resize(n, std::string(m, ' '));
     for (int i = 0; i < n; ++i) {
         std::cin >> grid[i];
@@ -96,19 +94,22 @@ std::string solve(std::vector<std::string> &grid){
         position p = q.front();
         q.pop();
 
-        if (check_goal(p.grid)) {
+        if (check_solved(p.grid)) {
             std::string ans;
             while (p.relation != position::ROOT) {
                 ans += p.relation == position::UP ? "U" : p.relation == position::DOWN ? "D" : p.relation == position::LEFT ? "L" : "R";
                 p = *p.parent;
             }
+
             return ans;
         }
 
-        get_up(p);
-        get_down(p);
-        get_left(p);
-        get_right(p);
+        position upper, lower, left, right;
+
+        get_up(p, upper);
+        get_down(p, lower);
+        get_left(p, left);
+        get_right(p, right);
         if (p.up != nullptr) {
             if (visited.find(p.up->grid) == visited.end()) {
                 q.push(*p.up);
@@ -179,7 +180,7 @@ bool check_invalide(std::vector<std::string> &grid) {
         }
     }
 
-    // Check if There are more boxes than target positions
+    // Check if the number of boxes and targets match
     int boxes = 0, targets = 0;
     for (const auto& row : grid) {
         for (char c : row) {
@@ -187,7 +188,7 @@ bool check_invalide(std::vector<std::string> &grid) {
             if (c == 'T') ++targets;
         }
     }
-    if (boxes > targets) return true;
+    if (boxes != targets) return true;
 
     // Check if there are more then one start position (character s)
     int start = 0;
@@ -204,8 +205,7 @@ bool check_invalide(std::vector<std::string> &grid) {
     return false;
 }
 
-void get_up(position& p){
-    position result;
+void get_up(position& p, position& result) {
     result.relation = position::UP;
     result.grid = p.grid;
     for (size_t i = 1; i < p.grid.size(); ++i) {
@@ -214,13 +214,11 @@ void get_up(position& p){
                 switch (p.grid[i-1][j]){
                     case '#': // wall
                         p.up = nullptr;
-                        // delete &result;
                         return;
                     case 'B': // box
                     case 'R':
                         if (p.grid[i-2][j] == '#' || p.grid[i-2][j] == 'B') { // wall or box behind the box
                             p.up = nullptr; 
-                            // delete &result;
                             return;
                         } else if (p.grid[i-2][j] == 'T'){ // target behind the box
                             result.grid[i-2][j] = 'R';
@@ -231,7 +229,7 @@ void get_up(position& p){
                             return;
                         } else { // box pushed
                             result.grid[i-2][j] = 'B';
-                            result.grid[i-1][j] = (p.grid[i-1][j] == 'T') ? 's' : 'S';
+                            result.grid[i-1][j] = (p.grid[i-1][j] == 'T' || p.grid[i-1][j] == 'R') ? 'S' : 's'; //Changed
                             result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
                             p.up = &result;
                             result.parent = &p;
@@ -242,23 +240,22 @@ void get_up(position& p){
                         result.grid[i][j] = '.';
                         p.up = &result;
                         result.parent = &p;
-                        break;
+                        return;
                     case '.':
                         result.grid[i-1][j] = 's';
-                        result.grid[i][j] = '.';
+                        result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.'; //Changed
                         p.up = &result;
                         result.parent = &p;
-                        break;
+                        return;
                     default:
-                        break;
+                        return;
                 }
             }
         }
     }
 }
 
-void get_down(position& p){
-    position result;
+void get_down(position& p, position& result){
     result.relation = position::DOWN;
     result.grid = p.grid;
     for (size_t i = 1; i < p.grid.size(); ++i) {
@@ -267,13 +264,11 @@ void get_down(position& p){
                 switch (p.grid[i+1][j]){
                     case '#': // wall
                         p.down = nullptr;
-                        // delete &result;
                         return;
                     case 'B': // box
                     case 'R':
                         if (p.grid[i+2][j] == '#' || p.grid[i+2][j] == 'B') { // wall or box behind the box
                             p.down = nullptr; 
-                            // delete &result;
                             return;
                         } else if (p.grid[i+2][j] == 'T'){ // target behind the box
                             result.grid[i+2][j] = 'R';
@@ -284,7 +279,7 @@ void get_down(position& p){
                             return;
                         } else { // box pushed
                             result.grid[i+2][j] = 'B';
-                            result.grid[i+1][j] = (p.grid[i+1][j] == 'T') ? 's' : 'S';
+                            result.grid[i+1][j] = (p.grid[i+1][j] == 'T' || p.grid[i+1][j] == 'R') ? 'S' : 's';
                             result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
                             p.down = &result;
                             result.parent = &p;
@@ -292,16 +287,16 @@ void get_down(position& p){
                         }    
                     case 'T':
                         result.grid[i+1][j] = 'S';
-                        result.grid[i][j] = '.';
+                        result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.'; //Changed
                         p.down = &result;
                         result.parent = &p;
-                        break;    
+                        return;
                     case '.':
                         result.grid[i+1][j] = 's';
-                        result.grid[i][j] = '.';
+                        result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.'; //Changed
                         p.down = &result;
                         result.parent = &p;
-                        break;
+                        return;
                     default:
                         break;
                 }
@@ -310,38 +305,35 @@ void get_down(position& p){
     }
 }
 
-void get_left(position& p){
-    position result;
+void get_left(position& p, position& result){
     result.relation = position::LEFT;
     result.grid = p.grid;
     for (size_t i = 1; i < p.grid.size(); ++i) {
-        for (size_t j = 0; j < p.grid[i].size(); ++j) {
+        for (size_t j = 1; j < p.grid[i].size(); ++j) {
             if (p.grid[i][j] == 's' || p.grid[i][j] == 'S') {
                 switch (p.grid[i][j-1]){
                     case '#': // wall
                         p.left = nullptr;
-                        // delete &result;
-                        return;
+                        break;
                     case 'B': // box
                     case 'R':
                         if (p.grid[i][j-2] == '#' || p.grid[i][j-2] == 'B') { // wall or box behind the box
                             p.left = nullptr; 
-                            // delete &result;
-                            return;
+                            break;
                         } else if (p.grid[i][j-2] == 'T'){ // target behind the box
                             result.grid[i][j-2] = 'R';
                             result.grid[i][j-1] = (p.grid[i][j-1] == 'R') ? 'S' : 's';  
                             result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
                             p.left = &result;
                             result.parent = &p;
-                            return;
+                            break;
                         } else { // box pushed
                             result.grid[i][j-2] = 'B';
-                            result.grid[i][j-1] = (p.grid[i][j-1] == 'T') ? 's' : 'S';
+                            result.grid[i][j-1] = (p.grid[i][j-1] == 'T' || p.grid[i][j-1] == 'R') ? 'S' : 's';
                             result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
                             p.left = &result;
                             result.parent = &p;
-                            return;
+                            break;
                         }    
                     case 'T':
                         result.grid[i][j-1] = 'S';
@@ -351,7 +343,7 @@ void get_left(position& p){
                         break;
                     case '.':
                         result.grid[i][j-1] = 's';
-                        result.grid[i][j] = '.';
+                        result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
                         p.left = &result;
                         result.parent = &p;
                         break;
@@ -363,8 +355,7 @@ void get_left(position& p){
     }
 }
 
-void get_right(position& p){
-    position result;
+void get_right(position& p, position& result){
     result.relation = position::RIGHT;
     result.grid = p.grid;
     for (size_t i = 1; i < p.grid.size(); ++i) {
@@ -373,13 +364,11 @@ void get_right(position& p){
                 switch (p.grid[i][j+1]){
                     case '#': // wall
                         p.right = nullptr;
-                        // delete &result;
                         return;
                     case 'B': // box
                     case 'R':
                         if (p.grid[i][j+2] == '#' || p.grid[i][j+2] == 'B') { // wall or box behind the box
                             p.right = nullptr; 
-                            // delete &result;
                             return;
                         } else if (p.grid[i][j+2] == 'T'){ // target behind the box
                             result.grid[i][j+2] = 'R';
@@ -390,7 +379,7 @@ void get_right(position& p){
                             return;
                         } else { // box pushed
                             result.grid[i][j+2] = 'B';
-                            result.grid[i][j+1] = (p.grid[i][j+1] == 'T') ? 's' : 'S';
+                            result.grid[i][j+1] = (p.grid[i][j+1] == 'T' || p.grid[i][j+1] == 'R') ? 'S' : 's';
                             result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
                             p.right = &result;
                             result.parent = &p;
@@ -398,16 +387,16 @@ void get_right(position& p){
                         }    
                     case 'T':
                         result.grid[i][j+1] = 'S';
-                        result.grid[i][j] = '.';
+                        result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.'; //Changed
                         p.right = &result;
                         result.parent = &p;
-                        break;
+                        return;
                     case '.':
                         result.grid[i][j+1] = 's';
-                        result.grid[i][j] = '.';
+                        result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.'; //Changed
                         p.right = &result;
                         result.parent = &p;
-                        break;
+                        return;
                     default:
                         break;
                 }
