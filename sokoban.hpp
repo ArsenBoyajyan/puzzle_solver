@@ -39,10 +39,10 @@ bool check_solved(std::vector<std::string> &grid);
  * @retval None
  */
 void read_map(std::vector<std::string> &grid) {
-    int n, m;
+    unsigned long n, m;
     std::cin >> m >> n;
     grid.resize(n, std::string(m, ' '));
-    for (int i = 0; i < n; ++i) {
+    for (unsigned long i = 0; i < n; ++i) {
         std::cin >> grid[i];
     }
 }
