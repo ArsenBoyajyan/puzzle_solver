@@ -11,17 +11,7 @@ struct position {
     position* down = nullptr;
     position* left = nullptr;
     position* right = nullptr;
-    position* parent = nullptr;
     std::string path = "";
-
-    enum RELATION {
-        ROOT,
-        UP,
-        DOWN,
-        LEFT,
-        RIGHT
-    };
-    RELATION relation = ROOT;
 
     position& operator=(const position& other) {
         grid = other.grid;
@@ -29,8 +19,6 @@ struct position {
         down = other.down;
         left = other.left;
         right = other.right;
-        parent = other.parent;
-        relation = other.relation;
         path = other.path;
         return *this;
     }
@@ -203,7 +191,6 @@ bool check_invalide(std::vector<std::string> &grid) {
 }
 
 void get_up(position& p, position& result) {
-    result.relation = position::UP;
     result.grid = p.grid;
     result.path = p.path + 'U';
     for (size_t i = 1; i < p.grid.size(); ++i) {
@@ -223,27 +210,23 @@ void get_up(position& p, position& result) {
                             result.grid[i-1][j] = (p.grid[i-1][j] == 'R') ? 'S' : 's';
                             result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
                             p.up = &result;
-                            result.parent = &p;
                             return;
                         } else { // box pushed
                             result.grid[i-2][j] = 'B';
                             result.grid[i-1][j] = (p.grid[i-1][j] == 'T' || p.grid[i-1][j] == 'R') ? 'S' : 's'; //Changed
                             result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
                             p.up = &result;
-                            result.parent = &p;
                             return;
                         }    
                     case 'T':
                         result.grid[i-1][j] = 'S';
                         result.grid[i][j] = '.';
                         p.up = &result;
-                        result.parent = &p;
                         return;
                     case '.':
                         result.grid[i-1][j] = 's';
                         result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.'; //Changed
                         p.up = &result;
-                        result.parent = &p;
                         return;
                     default:
                         return;
@@ -254,7 +237,6 @@ void get_up(position& p, position& result) {
 }
 
 void get_down(position& p, position& result){
-    result.relation = position::DOWN;
     result.grid = p.grid;
     result.path = p.path + "D";
     for (size_t i = 1; i < p.grid.size(); ++i) {
@@ -274,27 +256,23 @@ void get_down(position& p, position& result){
                             result.grid[i+1][j] = (p.grid[i+1][j] == 'R') ? 'S' : 's';
                             result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
                             p.down = &result;
-                            result.parent = &p;
                             return;
                         } else { // box pushed
                             result.grid[i+2][j] = 'B';
                             result.grid[i+1][j] = (p.grid[i+1][j] == 'T' || p.grid[i+1][j] == 'R') ? 'S' : 's';
                             result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
                             p.down = &result;
-                            result.parent = &p;
                             return;
                         }    
                     case 'T':
                         result.grid[i+1][j] = 'S';
                         result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.'; //Changed
                         p.down = &result;
-                        result.parent = &p;
                         return;
                     case '.':
                         result.grid[i+1][j] = 's';
                         result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.'; //Changed
                         p.down = &result;
-                        result.parent = &p;
                         return;
                     default:
                         break;
@@ -305,7 +283,6 @@ void get_down(position& p, position& result){
 }
 
 void get_left(position& p, position& result){
-    result.relation = position::LEFT;
     result.grid = p.grid;
     result.path = p.path + 'L';
     for (size_t i = 1; i < p.grid.size(); ++i) {
@@ -325,27 +302,23 @@ void get_left(position& p, position& result){
                             result.grid[i][j-1] = (p.grid[i][j-1] == 'R') ? 'S' : 's';  
                             result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
                             p.left = &result;
-                            result.parent = &p;
                             break;
                         } else { // box pushed
                             result.grid[i][j-2] = 'B';
                             result.grid[i][j-1] = (p.grid[i][j-1] == 'T' || p.grid[i][j-1] == 'R') ? 'S' : 's';
                             result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
                             p.left = &result;
-                            result.parent = &p;
                             break;
                         }    
                     case 'T':
                         result.grid[i][j-1] = 'S';
                         result.grid[i][j] = '.';
                         p.left = &result;
-                        result.parent = &p;
                         break;
                     case '.':
                         result.grid[i][j-1] = 's';
                         result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
                         p.left = &result;
-                        result.parent = &p;
                         break;
                     default:
                         break;
@@ -356,7 +329,6 @@ void get_left(position& p, position& result){
 }
 
 void get_right(position& p, position& result){
-    result.relation = position::RIGHT;
     result.grid = p.grid;
     result.path = p.path + 'R';
     for (size_t i = 1; i < p.grid.size(); ++i) {
@@ -376,27 +348,23 @@ void get_right(position& p, position& result){
                             result.grid[i][j+1] = (p.grid[i][j+1] == 'R') ? 'S' : 's';
                             result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
                             p.right = &result;
-                            result.parent = &p;
                             return;
                         } else { // box pushed
                             result.grid[i][j+2] = 'B';
                             result.grid[i][j+1] = (p.grid[i][j+1] == 'T' || p.grid[i][j+1] == 'R') ? 'S' : 's';
                             result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
                             p.right = &result;
-                            result.parent = &p;
                             return;
                         }    
                     case 'T':
                         result.grid[i][j+1] = 'S';
                         result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.'; //Changed
                         p.right = &result;
-                        result.parent = &p;
                         return;
                     case '.':
                         result.grid[i][j+1] = 's';
                         result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.'; //Changed
                         p.right = &result;
-                        result.parent = &p;
                         return;
                     default:
                         break;
