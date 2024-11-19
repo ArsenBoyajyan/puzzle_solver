@@ -12,6 +12,7 @@ struct position {
     position* left = nullptr;
     position* right = nullptr;
     position* parent = nullptr;
+    std::string path = "";
 
     enum RELATION {
         ROOT,
@@ -23,13 +24,14 @@ struct position {
     RELATION relation = ROOT;
 
     position& operator=(const position& other) {
-        grid = other.grid; 
+        grid = other.grid;
         up = other.up;
         down = other.down;
         left = other.left;
         right = other.right;
         parent = other.parent;
         relation = other.relation;
+        path = other.path;
         return *this;
     }
 };
@@ -91,17 +93,12 @@ std::string solve(std::vector<std::string> &grid){
 
 
     while (!q.empty()) {
-        position p = q.front();
+        position p;
+        p = q.front();
         q.pop();
 
         if (check_solved(p.grid)) {
-            std::string ans;
-            while (p.relation != position::ROOT) {
-                ans += p.relation == position::UP ? "U" : p.relation == position::DOWN ? "D" : p.relation == position::LEFT ? "L" : "R";
-                p = *p.parent;
-            }
-
-            return ans;
+            return p.path;
         }
 
         position upper, lower, left, right;
@@ -208,6 +205,7 @@ bool check_invalide(std::vector<std::string> &grid) {
 void get_up(position& p, position& result) {
     result.relation = position::UP;
     result.grid = p.grid;
+    result.path = p.path + 'U';
     for (size_t i = 1; i < p.grid.size(); ++i) {
         for (size_t j = 0; j < p.grid[i].size(); ++j) {
             if (p.grid[i][j] == 's' || p.grid[i][j] == 'S') {
@@ -258,6 +256,7 @@ void get_up(position& p, position& result) {
 void get_down(position& p, position& result){
     result.relation = position::DOWN;
     result.grid = p.grid;
+    result.path = p.path + "D";
     for (size_t i = 1; i < p.grid.size(); ++i) {
         for (size_t j = 0; j < p.grid[i].size(); ++j) {
             if (p.grid[i][j] == 's' || p.grid[i][j] == 'S') {
@@ -308,6 +307,7 @@ void get_down(position& p, position& result){
 void get_left(position& p, position& result){
     result.relation = position::LEFT;
     result.grid = p.grid;
+    result.path = p.path + 'L';
     for (size_t i = 1; i < p.grid.size(); ++i) {
         for (size_t j = 1; j < p.grid[i].size(); ++j) {
             if (p.grid[i][j] == 's' || p.grid[i][j] == 'S') {
@@ -358,6 +358,7 @@ void get_left(position& p, position& result){
 void get_right(position& p, position& result){
     result.relation = position::RIGHT;
     result.grid = p.grid;
+    result.path = p.path + 'R';
     for (size_t i = 1; i < p.grid.size(); ++i) {
         for (size_t j = 0; j < p.grid[i].size(); ++j) {
             if (p.grid[i][j] == 's' || p.grid[i][j] == 'S') {
