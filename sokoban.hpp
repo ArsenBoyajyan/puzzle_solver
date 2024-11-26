@@ -88,6 +88,10 @@ std::string solve(std::vector<std::string> &grid){
         if (check_solved(p.grid)) {
             return p.path;
         }
+        
+        // if (check_invalide(p.grid)) {
+        //     continue;
+        // }
 
         position upper, lower, left, right;
 
@@ -170,7 +174,7 @@ bool check_invalide(std::vector<std::string> &grid) {
     for (const auto& row : grid) {
         for (char c : row) {
             if (c == 'B') ++boxes;
-            if (c == 'T') ++targets;
+            if (c == 'T' || c == 's') ++targets;
         }
     }
     if (boxes != targets) return true;
@@ -179,7 +183,7 @@ bool check_invalide(std::vector<std::string> &grid) {
     int start = 0;
     for (const auto& row : grid) {
         for (char c : row) {
-            if (c == 's') ++start;
+            if (c == 's' || c == 'S') ++start;
         }
     }
     if (start > 1) return true;
@@ -195,7 +199,7 @@ void get_up(position& p, position& result) {
     result.path = p.path + 'U';
     for (size_t i = 1; i < p.grid.size(); ++i) {
         for (size_t j = 0; j < p.grid[i].size(); ++j) {
-            if (p.grid[i][j] == 's' || p.grid[i][j] == 'S') {
+            if (p.grid[i][j] == 'S' || p.grid[i][j] == 's') {
                 switch (p.grid[i-1][j]){
                     case '#': // wall
                         p.up = nullptr;
@@ -207,25 +211,25 @@ void get_up(position& p, position& result) {
                             return;
                         } else if (p.grid[i-2][j] == 'T'){ // target behind the box
                             result.grid[i-2][j] = 'R';
-                            result.grid[i-1][j] = (p.grid[i-1][j] == 'R') ? 'S' : 's';
-                            result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
+                            result.grid[i-1][j] = (p.grid[i-1][j] == 'R') ? 's' : 'S';
+                            result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.';
                             p.up = &result;
                             return;
                         } else { // box pushed
                             result.grid[i-2][j] = 'B';
-                            result.grid[i-1][j] = (p.grid[i-1][j] == 'T' || p.grid[i-1][j] == 'R') ? 'S' : 's'; //Changed
-                            result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
+                            result.grid[i-1][j] = (p.grid[i-1][j] == 'T' || p.grid[i-1][j] == 'R') ? 's' : 'S'; //Changed
+                            result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.';
                             p.up = &result;
                             return;
                         }    
                     case 'T':
-                        result.grid[i-1][j] = 'S';
+                        result.grid[i-1][j] = 's';
                         result.grid[i][j] = '.';
                         p.up = &result;
                         return;
                     case '.':
-                        result.grid[i-1][j] = 's';
-                        result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.'; //Changed
+                        result.grid[i-1][j] = 'S';
+                        result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.'; //Changed
                         p.up = &result;
                         return;
                     default:
@@ -241,7 +245,7 @@ void get_down(position& p, position& result){
     result.path = p.path + "D";
     for (size_t i = 1; i < p.grid.size(); ++i) {
         for (size_t j = 0; j < p.grid[i].size(); ++j) {
-            if (p.grid[i][j] == 's' || p.grid[i][j] == 'S') {
+            if (p.grid[i][j] == 'S' || p.grid[i][j] == 's') {
                 switch (p.grid[i+1][j]){
                     case '#': // wall
                         p.down = nullptr;
@@ -253,25 +257,25 @@ void get_down(position& p, position& result){
                             return;
                         } else if (p.grid[i+2][j] == 'T'){ // target behind the box
                             result.grid[i+2][j] = 'R';
-                            result.grid[i+1][j] = (p.grid[i+1][j] == 'R') ? 'S' : 's';
-                            result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
+                            result.grid[i+1][j] = (p.grid[i+1][j] == 'R') ? 's' : 'S';
+                            result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.';
                             p.down = &result;
                             return;
                         } else { // box pushed
                             result.grid[i+2][j] = 'B';
-                            result.grid[i+1][j] = (p.grid[i+1][j] == 'T' || p.grid[i+1][j] == 'R') ? 'S' : 's';
-                            result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
+                            result.grid[i+1][j] = (p.grid[i+1][j] == 'T' || p.grid[i+1][j] == 'R') ? 's' : 'S';
+                            result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.';
                             p.down = &result;
                             return;
                         }    
                     case 'T':
-                        result.grid[i+1][j] = 'S';
-                        result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.'; //Changed
+                        result.grid[i+1][j] = 's';
+                        result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.'; //Changed
                         p.down = &result;
                         return;
                     case '.':
-                        result.grid[i+1][j] = 's';
-                        result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.'; //Changed
+                        result.grid[i+1][j] = 'S';
+                        result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.'; //Changed
                         p.down = &result;
                         return;
                     default:
@@ -287,7 +291,7 @@ void get_left(position& p, position& result){
     result.path = p.path + 'L';
     for (size_t i = 1; i < p.grid.size(); ++i) {
         for (size_t j = 1; j < p.grid[i].size(); ++j) {
-            if (p.grid[i][j] == 's' || p.grid[i][j] == 'S') {
+            if (p.grid[i][j] == 'S' || p.grid[i][j] == 's') {
                 switch (p.grid[i][j-1]){
                     case '#': // wall
                         p.left = nullptr;
@@ -299,25 +303,25 @@ void get_left(position& p, position& result){
                             break;
                         } else if (p.grid[i][j-2] == 'T'){ // target behind the box
                             result.grid[i][j-2] = 'R';
-                            result.grid[i][j-1] = (p.grid[i][j-1] == 'R') ? 'S' : 's';  
-                            result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
+                            result.grid[i][j-1] = (p.grid[i][j-1] == 'R') ? 's' : 'S';  
+                            result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.';
                             p.left = &result;
                             break;
                         } else { // box pushed
                             result.grid[i][j-2] = 'B';
-                            result.grid[i][j-1] = (p.grid[i][j-1] == 'T' || p.grid[i][j-1] == 'R') ? 'S' : 's';
-                            result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
+                            result.grid[i][j-1] = (p.grid[i][j-1] == 'T' || p.grid[i][j-1] == 'R') ? 's' : 'S';
+                            result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.';
                             p.left = &result;
                             break;
                         }    
                     case 'T':
-                        result.grid[i][j-1] = 'S';
+                        result.grid[i][j-1] = 's';
                         result.grid[i][j] = '.';
                         p.left = &result;
                         break;
                     case '.':
-                        result.grid[i][j-1] = 's';
-                        result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
+                        result.grid[i][j-1] = 'S';
+                        result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.';
                         p.left = &result;
                         break;
                     default:
@@ -333,7 +337,7 @@ void get_right(position& p, position& result){
     result.path = p.path + 'R';
     for (size_t i = 1; i < p.grid.size(); ++i) {
         for (size_t j = 0; j < p.grid[i].size(); ++j) {
-            if (p.grid[i][j] == 's' || p.grid[i][j] == 'S') {
+            if (p.grid[i][j] == 'S' || p.grid[i][j] == 's') {
                 switch (p.grid[i][j+1]){
                     case '#': // wall
                         p.right = nullptr;
@@ -345,25 +349,25 @@ void get_right(position& p, position& result){
                             return;
                         } else if (p.grid[i][j+2] == 'T'){ // target behind the box
                             result.grid[i][j+2] = 'R';
-                            result.grid[i][j+1] = (p.grid[i][j+1] == 'R') ? 'S' : 's';
-                            result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
+                            result.grid[i][j+1] = (p.grid[i][j+1] == 'R') ? 's' : 'S';
+                            result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.';
                             p.right = &result;
                             return;
                         } else { // box pushed
                             result.grid[i][j+2] = 'B';
-                            result.grid[i][j+1] = (p.grid[i][j+1] == 'T' || p.grid[i][j+1] == 'R') ? 'S' : 's';
-                            result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.';
+                            result.grid[i][j+1] = (p.grid[i][j+1] == 'T' || p.grid[i][j+1] == 'R') ? 's' : 'S';
+                            result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.';
                             p.right = &result;
                             return;
                         }    
                     case 'T':
-                        result.grid[i][j+1] = 'S';
-                        result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.'; //Changed
+                        result.grid[i][j+1] = 's';
+                        result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.'; //Changed
                         p.right = &result;
                         return;
                     case '.':
-                        result.grid[i][j+1] = 's';
-                        result.grid[i][j] = (p.grid[i][j] == 'S') ? 'T' : '.'; //Changed
+                        result.grid[i][j+1] = 'S';
+                        result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.'; //Changed
                         p.right = &result;
                         return;
                     default:
