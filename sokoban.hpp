@@ -28,8 +28,9 @@ void get_up(position& p, position& result);
 void get_down(position& p, position& result);
 void get_left(position& p, position& result);
 void get_right(position& p, position& result);
-bool check_invalide(std::vector<std::string> &grid);
+bool check_invalide(const std::vector<std::string> &grid);
 bool check_solved(std::vector<std::string> &grid);
+bool check_deadlock(const std::vector<std::string> &grid);
 
 
 /**
@@ -81,6 +82,7 @@ std::string solve(std::vector<std::string> &grid){
 
 
     while (!q.empty()) {
+
         position p;
         p = q.front();
         q.pop();
@@ -89,9 +91,9 @@ std::string solve(std::vector<std::string> &grid){
             return p.path;
         }
         
-        // if (check_invalide(p.grid)) {
-        //     continue;
-        // }
+        if (check_deadlock(p.grid)) {
+            continue;
+        }
 
         position upper, lower, left, right;
 
@@ -125,7 +127,7 @@ std::string solve(std::vector<std::string> &grid){
         }
     }
     
-    return "";
+    return "No solution!";
 }
 
 // For big cases, paste your answers here (i.e. replace "ans for big 1" with your answer)
@@ -154,42 +156,59 @@ std::string print_answer(int index) {
     return answers[(size_t)index];
 }
 
-bool check_invalide(std::vector<std::string> &grid) {
-    // Check if there's a box surrounded by walls or other boxes in a way that makes it immovable
-    for (size_t i = 1; i < grid.size(); ++i) {
-        for (size_t j = 1; j < grid[i].size(); ++j) {
+bool check_invalide(const std::vector<std::string>& grid) {
+    unsigned long rows = (unsigned long) grid.size();
+    unsigned long cols = (unsigned long) grid[0].size();
+    int start_count = 0;
+    int box_count = 0;
+    int target_count = 0;
+
+    for (unsigned long i = 0; i < rows; ++i) {
+        for (unsigned long j = 0; j < cols; ++j) {
+            char cell = grid[i][j];
+            if (cell == 'S') start_count++;
+            else if (cell == 'B') box_count++;
+            else if (cell == 'T') target_count++;
+        }
+    }
+
+    //Check for multiple starts or no starts
+    if (start_count != 1) return true;
+
+    //Check if more boxes than targets
+    if (box_count > target_count) return true;
+
+    //Check for immovable boxes (simplified check - could be improved)
+    return check_deadlock(grid);
+}
+
+bool check_deadlock(const std::vector<std::string> &grid) {
+    unsigned long rows = (unsigned long) grid.size();
+    unsigned long cols = (unsigned long) grid[0].size();
+
+    for (unsigned long i = 1; i < rows - 1; ++i) {
+        for (unsigned long j = 1; j < cols - 1; ++j) {
             if (grid[i][j] == 'B') {
-                bool is_surrounded = true;
-                if (grid[i-1][j] != '#' && grid[i-1][j] != 'B') is_surrounded = false;
-                if (grid[i+1][j] != '#' && grid[i+1][j] != 'B') is_surrounded = false;
-                if (grid[i][j-1] != '#' && grid[i][j-1] != 'B') is_surrounded = false;
-                if (grid[i][j+1] != '#' && grid[i][j+1] != 'B') is_surrounded = false;
-                if (is_surrounded) return true;
+                // Check for box in a corner
+                bool top_wall = (grid[i-1][j] == '#');
+                bool bottom_wall = (grid[i+1][j] == '#');
+                bool left_wall = (grid[i][j-1] == '#');
+                bool right_wall = (grid[i][j+1] == '#');
+
+                if ((top_wall || bottom_wall) && (left_wall || right_wall)) {
+                    return true;
+                }
+
+                // Check for box against two walls in a T-junction
+                if ((top_wall && left_wall && grid[i-1][j-1] == '#') || 
+                    (top_wall && right_wall && grid[i-1][j+1] == '#') ||
+                    (bottom_wall && left_wall && grid[i+1][j-1] == '#') ||
+                    (bottom_wall && right_wall && grid[i+1][j+1] == '#')) {
+                    return true;
+                }
             }
         }
     }
-
-    // Check if the number of boxes and targets match
-    int boxes = 0, targets = 0;
-    for (const auto& row : grid) {
-        for (char c : row) {
-            if (c == 'B') ++boxes;
-            if (c == 'T' || c == 's') ++targets;
-        }
-    }
-    if (boxes != targets) return true;
-
-    // Check if there are more then one start position (character s)
-    int start = 0;
-    for (const auto& row : grid) {
-        for (char c : row) {
-            if (c == 's' || c == 'S') ++start;
-        }
-    }
-    if (start > 1) return true;
-
-    // Check if Any box is placed in a corner or against a wall where it has no path to the target position
-    // TODO this is a bit tricky, need to think about it
 
     return false;
 }
@@ -381,11 +400,10 @@ void get_right(position& p, position& result){
 bool check_solved(std::vector<std::string> &grid) {
     for (size_t i = 1; i < grid.size(); ++i) {
         for (size_t j = 0; j < grid[i].size(); ++j) {
-            if (grid[i][j] == 'T' || grid[i][j] == 'B') {
+            if (grid[i][j] == 'T' || grid[i][j] == 's') {
                 return false;
             }
         }
     }
     return true;
 }
-    
