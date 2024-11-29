@@ -78,7 +78,7 @@ std::string solve(std::vector<std::string> &grid){
     };
     std::unordered_set<std::vector<std::string>, GridHash> visited;
     
-    visited.insert(root.grid);
+    // visited.insert(root.grid);
 
 
     while (!q.empty()) {
@@ -91,9 +91,11 @@ std::string solve(std::vector<std::string> &grid){
             return p.path;
         }
         
-        if (check_deadlock(p.grid)) {
+        if (check_deadlock(p.grid) || visited.find(p.grid) != visited.end()) {
             continue;
         }
+
+        visited.insert(p.grid);
 
         position upper, lower, left, right;
 
@@ -102,28 +104,16 @@ std::string solve(std::vector<std::string> &grid){
         get_left(p, left);
         get_right(p, right);
         if (p.up != nullptr) {
-            if (visited.find(p.up->grid) == visited.end()) {
-                q.push(*p.up);
-                visited.insert(p.up->grid);
-            }
+            q.push(*p.up);
         }
         if (p.down != nullptr) {
-            if (visited.find(p.down->grid) == visited.end()) {
-                q.push(*p.down);
-                visited.insert(p.down->grid);
-            }
+            q.push(*p.down);
         }
         if (p.left != nullptr) {
-            if (visited.find(p.left->grid) == visited.end()) {
-                q.push(*p.left);
-                visited.insert(p.left->grid);
-            }
+            q.push(*p.left);
         }
         if (p.right != nullptr) {
-            if (visited.find(p.right->grid) == visited.end()) {
-                q.push(*p.right);
-                visited.insert(p.right->grid);
-            }
+            q.push(*p.right);
         }
     }
     
@@ -137,15 +127,15 @@ std::string solve(std::vector<std::string> &grid){
 const std::vector<std::string> answers = {
     "__leave_this_blank__", 
     "ans for big 1",
-    "ans for big 2",
-    "ans for big 3",
-    "ans for big 4",
+    "LLRDDLLUULUUURRDLDUURRRDLLULLDDRUDDDURRRU",
+    "DRUUUULUURDRRURDDDRDLDDRLULRUULD",
+    "RRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRR",
     "ans for big 5",
-    "ans for big 6",
+    "LRURURULUULLDRURRDLDDRUDDDLLLLURUURUL",
     "ans for big 7",
-    "ans for big 8",
-    "ans for big 9",
-    "ans for big 10"
+    "ULDDDRDLLLLUURDLDRUUDDRRULDLU",
+    "RDDDDUULLLDDLLURDRRRDRLRUULULLDLDRRLUURRDD",
+    "LLLDDLRRRRRUUUULDDDRDLLLLULURUULURDRR"
 };
 
 // Don't modify this.
