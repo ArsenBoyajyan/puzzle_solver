@@ -3,7 +3,6 @@
 #include <iostream>
 #include <unordered_set>
 #include <queue>
-#include <bitset>
 #include <algorithm>
 
 
@@ -43,16 +42,12 @@ class state {
             }
         }
 
-        state(const state& other) {
-            // path = other.path;
-            boxes = other.boxes;
-            player = other.player;
-            parent = other.parent;
+        state(const state& other) 
+            : boxes(other.boxes), player(other.player), parent(other.parent) {
         }
 
         state& operator=(const state& other) {
             parent = other.parent;
-            // path = other.path;
             boxes = other.boxes;
             player = other.player;
             return *this;
@@ -61,48 +56,6 @@ class state {
         bool operator==(const state& other) const {
             return boxes == other.boxes && player.x == other.player.x && player.y == other.player.y;
         }
-
-        // void add_path(char direction) {
-        //     switch (direction) {
-        //         case 'U':
-        //             path.push_back(0);
-        //             break;
-        //         case 'D':
-        //             path.push_back(1);
-        //             break;
-        //         case 'L':
-        //             path.push_back(2);
-        //             break;
-        //         case 'R':
-        //             path.push_back(3);
-        //             break;
-        //         default:
-        //             break;
-        //     }
-        // }
-
-        // std::string get_path() {
-        //     std::string result;
-        //     for (uint16_t i = 0; i < path.size(); ++i) {
-        //         switch (path[i].to_ulong()) {
-        //             case 0:
-        //                 result += 'U';
-        //                 break;
-        //             case 1:
-        //                 result += 'D';
-        //                 break;
-        //             case 2:
-        //                 result += 'L';
-        //                 break;
-        //             case 3:
-        //                 result += 'R';
-        //                 break;
-        //             default:
-        //                 break;
-        //         }
-        //     }
-        //     return result;
-        // }
 
         std::string get_path() {
             std::string result;
@@ -172,8 +125,7 @@ class state {
                     }
                 }
             }
-            
-            // result.add_path(direction);
+
             return result;
         }
 
@@ -248,7 +200,6 @@ class state {
             return result;
         }
     private:
-        // std::vector<std::bitset<2>> path; // 0 - up, 1 - down, 2 - left, 3 - right
         std::vector<coordinate> boxes;
         coordinate player;
         state* parent;
@@ -280,25 +231,24 @@ std::string solve(std::vector<std::string> &grid){
     if (check_invalide(grid)) {
         return "No solution!";
     }
-    state s(grid);
+    state start(grid);
+    if (start.check_solved(grid)) {
+        return "";
+    }
     std::unordered_set<state, state::hash> visited;
     std::queue<state> q;
-    q.push(s);
+    q.push(start);
     while (!q.empty()) {
         
-        state s = q.front();
-        // std::vector<std::string> new_grid = s.get_grid(grid);
-        // for (int i =0; i < (int)grid.size(); ++i) {
-        //     std::cout << new_grid[i] << std::endl;
-        // }
-        // std::cout << "--------------------\n";
+        state current_state = q.front();
         q.pop();
-        if (s.check_solved(grid)) {
-            return s.get_path();
-        }
-        if (s.visit(visited)) {
+
+        if (current_state.visit(visited)) {
             for (char direction : "UDLR") {
-                state new_state = s.move(grid, direction);
+                state new_state = current_state.move(grid, direction);
+                if (new_state.check_solved(grid)) {
+                    return new_state.get_path();
+                }
                 if (!new_state.check_deadlock(grid)) {
                     q.push(new_state);
                 }
