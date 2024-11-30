@@ -3,35 +3,257 @@
 #include <iostream>
 #include <unordered_set>
 #include <queue>
+#include <bitset>
+#include <algorithm>
 
-// Each possible permutation of figures is represented as a node of a graph
-struct position {
-    std::vector<std::string> grid;
-    position* up = nullptr;
-    position* down = nullptr;
-    position* left = nullptr;
-    position* right = nullptr;
-    std::string path = "";
 
-    position& operator=(const position& other) {
-        grid = other.grid;
-        up = other.up;
-        down = other.down;
-        left = other.left;
-        right = other.right;
-        path = other.path;
-        return *this;
+struct coordinate {
+    uint16_t x;
+    uint16_t y;
+
+    bool operator==(const coordinate& other) const {
+        return x == other.x && y == other.y;
     }
 };
 
-void get_up(position& p, position& result);
-void get_down(position& p, position& result);
-void get_left(position& p, position& result);
-void get_right(position& p, position& result);
-bool check_invalide(const std::vector<std::string> &grid);
-bool check_solved(std::vector<std::string> &grid);
-bool check_deadlock(const std::vector<std::string> &grid);
+bool check_invalide(const std::vector<std::string>& grid);
 
+class state {
+    public:
+        state(std::vector<std::string> &grid) {
+            uint16_t rows = (uint16_t) grid.size();
+            uint16_t cols = (uint16_t) grid[0].size();
+            parent = nullptr;
+            for (uint16_t i = 0; i < rows; ++i) {
+                for (uint16_t j = 0; j < cols; ++j) {
+                    if (grid[i][j] == 'B' ) {
+                        coordinate box = {j, i};
+                        grid[i][j] = '.';
+                        boxes.push_back(box);
+                    }
+                    if (grid[i][j] == 'S') {
+                        player = {j, i};
+                        grid[i][j] = '.';
+                    }
+                    if (grid[i][j] == 'R') {
+                        grid[i][j] = 'T';
+                        boxes.push_back({j, i});
+                    }
+                }
+            }
+        }
+
+        state(const state& other) {
+            // path = other.path;
+            boxes = other.boxes;
+            player = other.player;
+            parent = other.parent;
+        }
+
+        state& operator=(const state& other) {
+            parent = other.parent;
+            // path = other.path;
+            boxes = other.boxes;
+            player = other.player;
+            return *this;
+        }
+
+        bool operator==(const state& other) const {
+            return boxes == other.boxes && player.x == other.player.x && player.y == other.player.y;
+        }
+
+        // void add_path(char direction) {
+        //     switch (direction) {
+        //         case 'U':
+        //             path.push_back(0);
+        //             break;
+        //         case 'D':
+        //             path.push_back(1);
+        //             break;
+        //         case 'L':
+        //             path.push_back(2);
+        //             break;
+        //         case 'R':
+        //             path.push_back(3);
+        //             break;
+        //         default:
+        //             break;
+        //     }
+        // }
+
+        // std::string get_path() {
+        //     std::string result;
+        //     for (uint16_t i = 0; i < path.size(); ++i) {
+        //         switch (path[i].to_ulong()) {
+        //             case 0:
+        //                 result += 'U';
+        //                 break;
+        //             case 1:
+        //                 result += 'D';
+        //                 break;
+        //             case 2:
+        //                 result += 'L';
+        //                 break;
+        //             case 3:
+        //                 result += 'R';
+        //                 break;
+        //             default:
+        //                 break;
+        //         }
+        //     }
+        //     return result;
+        // }
+
+        std::string get_path() {
+            std::string result;
+            state* current = this;
+            while (current->parent != nullptr) {
+                coordinate parent_player = current->parent->player;
+                if (current->player.y < parent_player.y) {
+                    result.push_back('U');
+                } else if (current->player.y > parent_player.y) {
+                    result.push_back('D');
+                } else if (current->player.x < parent_player.x) {
+                    result.push_back('L');
+                } else if (current->player.x > parent_player.x) {
+                    result.push_back('R');
+                }
+                current = current->parent;
+            }
+            std::reverse(result.begin(), result.end());
+            return result;
+        }
+        state move (const std::vector<std::string> &grid, char direction) {
+            state result = *this;
+            result.parent = this;
+            switch (direction) {
+                case 'U':
+                    result.player.y = result.player.y - 1;
+                    break;
+                case 'D':
+                    result.player.y = result.player.y + 1;
+                    break;
+                case 'L':
+                    result.player.x = result.player.x - 1;
+                    break;
+                case 'R':
+                    result.player.x = result.player.x + 1;
+                    break;
+                default:
+                    break;
+            }
+
+            if (grid[result.player.y][result.player.x] == '#') {
+                return *this; // Wall, do nothing
+            }
+
+            for (auto& box : result.boxes) {
+                if (box.x == result.player.x && box.y == result.player.y) {
+                    switch (direction) {
+                        case 'U':
+                            box.y = box.y - 1;
+                            break;
+                        case 'D':
+                            box.y = box.y + 1;
+                            break;
+                        case 'L':
+                            box.x = box.x - 1;
+                            break;
+                        case 'R':
+                            box.x = box.x + 1;
+                            break;
+                        default:
+                            break;
+                    }
+                    
+                    if (grid[box.y][box.x] == '#' || 
+                        std::any_of(boxes.begin(), boxes.end(), [&](coordinate b) { return b.x == box.x && b.y == box.y; })) {
+                        return *this; // Obstacle behind the box, do nothing
+                    }
+                }
+            }
+            
+            // result.add_path(direction);
+            return result;
+        }
+
+        
+        bool check_deadlock(const std::vector<std::string> &grid) {
+            for (auto& box : boxes) {
+                if (grid[box.y][box.x] == 'T') {
+                    return false;
+                }
+                bool top_wall = (grid[box.y-1][box.x] == '#');
+                bool bottom_wall = (grid[box.y+1][box.x] == '#');
+                bool left_wall = (grid[box.y][box.x-1] == '#');
+                bool right_wall = (grid[box.y][box.x+1] == '#');
+
+                if ((top_wall || bottom_wall) && (left_wall || right_wall)) {
+                    return true;
+                }
+
+                if ((top_wall && left_wall && grid[box.y - 1][box.x-1] == '#') || 
+                    (top_wall && right_wall && grid[box.y - 1][box.x + 1] == '#') ||
+                    (bottom_wall && left_wall && grid[box.y + 1][box.x - 1] == '#') ||
+                    (bottom_wall && right_wall && grid[box.y + 1][box.x + 1] == '#')) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        bool check_solved(const std::vector<std::string> &grid) {
+            for (auto& box : boxes) {
+                if (grid[box.y][box.x] != 'T') {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        struct hash {
+            size_t operator()(const state& s) const {
+                size_t hash = 0;
+                unsigned char x, y;
+                for (const auto& box : s.boxes) {
+                    x = (unsigned char)box.x;
+                    y = (unsigned char)box.y;
+                    hash ^= std::hash<uint8_t>()(x) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+                    hash ^= std::hash<uint8_t>()(y) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+                }
+                x = (unsigned char)s.player.x;
+                y = (unsigned char)s.player.y;
+                hash ^= std::hash<uint8_t>()(x) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+                hash ^= std::hash<uint8_t>()(y) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+                return hash;
+            }
+        };
+
+        bool visit(std::unordered_set<state, hash> &visited) {
+            state s = *this;
+            if (visited.find(s) != visited.end()) {
+                return false;
+            }
+            visited.insert(s);
+            return true;
+        }
+
+        std::vector<std::string> get_grid(const std::vector<std::string> &grid) {
+            std::vector<std::string> result;
+            result = grid;
+            for (auto& box : boxes) {
+                result[box.y][box.x] = 'B';
+            }
+            result[player.y][player.x] = 'S';
+            return result;
+        }
+    private:
+        // std::vector<std::bitset<2>> path; // 0 - up, 1 - down, 2 - left, 3 - right
+        std::vector<coordinate> boxes;
+        coordinate player;
+        state* parent;
+        
+};
 
 /**
  * @brief  Read your map from stdin
@@ -58,65 +280,31 @@ std::string solve(std::vector<std::string> &grid){
     if (check_invalide(grid)) {
         return "No solution!";
     }
-
-    position root;
-    root.grid = grid;
-
-    std::queue<position> q;
-    q.push(root);
-
-    struct GridHash {
-        size_t operator()(const std::vector<std::string>& grid) const {
-            size_t seed = 0;
-            for (const auto& row : grid) {
-                for (char c : row) {
-                    seed ^= std::hash<char>{}(c) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    state s(grid);
+    std::unordered_set<state, state::hash> visited;
+    std::queue<state> q;
+    q.push(s);
+    while (!q.empty()) {
+        
+        state s = q.front();
+        // std::vector<std::string> new_grid = s.get_grid(grid);
+        // for (int i =0; i < (int)grid.size(); ++i) {
+        //     std::cout << new_grid[i] << std::endl;
+        // }
+        // std::cout << "--------------------\n";
+        q.pop();
+        if (s.check_solved(grid)) {
+            return s.get_path();
+        }
+        if (s.visit(visited)) {
+            for (char direction : "UDLR") {
+                state new_state = s.move(grid, direction);
+                if (!new_state.check_deadlock(grid)) {
+                    q.push(new_state);
                 }
             }
-            return seed;
-        }
-    };
-    std::unordered_set<std::vector<std::string>, GridHash> visited;
-    
-    // visited.insert(root.grid);
-
-
-    while (!q.empty()) {
-
-        position p;
-        p = q.front();
-        q.pop();
-
-        if (check_solved(p.grid)) {
-            return p.path;
-        }
-        
-        if (check_deadlock(p.grid) || visited.find(p.grid) != visited.end()) {
-            continue;
-        }
-
-        visited.insert(p.grid);
-
-        position upper, lower, left, right;
-
-        get_up(p, upper);
-        get_down(p, lower);
-        get_left(p, left);
-        get_right(p, right);
-        if (p.up != nullptr) {
-            q.push(*p.up);
-        }
-        if (p.down != nullptr) {
-            q.push(*p.down);
-        }
-        if (p.left != nullptr) {
-            q.push(*p.left);
-        }
-        if (p.right != nullptr) {
-            q.push(*p.right);
         }
     }
-    
     return "No solution!";
 }
 
@@ -135,7 +323,12 @@ const std::vector<std::string> answers = {
     "ans for big 7",
     "ULDDDRDLLLLUURDLDRUUDDRRULDLU",
     "RDDDDUULLLDDLLURDRRRDRLRUULULLDLDRRLUURRDD",
-    "LLLDDLRRRRRUUUULDDDRDLLLLULURUULURDRR"
+    "LLLDDLRRRRRUUUULDDDRDLLLLULURUULURDRR",
+    "ans for big 11",
+    "ans for big 12",
+    "ans for big 13",
+    "ans for big 14",
+    "ans for big 15"
 };
 
 // Don't modify this.
@@ -169,13 +362,6 @@ bool check_invalide(const std::vector<std::string>& grid) {
     if (box_count > target_count) return true;
 
     //Check for immovable boxes (simplified check - could be improved)
-    return check_deadlock(grid);
-}
-
-bool check_deadlock(const std::vector<std::string> &grid) {
-    unsigned long rows = (unsigned long) grid.size();
-    unsigned long cols = (unsigned long) grid[0].size();
-
     for (unsigned long i = 1; i < rows - 1; ++i) {
         for (unsigned long j = 1; j < cols - 1; ++j) {
             if (grid[i][j] == 'B') {
@@ -194,206 +380,11 @@ bool check_deadlock(const std::vector<std::string> &grid) {
                     (top_wall && right_wall && grid[i-1][j+1] == '#') ||
                     (bottom_wall && left_wall && grid[i+1][j-1] == '#') ||
                     (bottom_wall && right_wall && grid[i+1][j+1] == '#')) {
-                    return true;
-                }
+                        return true;
+                    }
             }
         }
     }
 
     return false;
-}
-
-void get_up(position& p, position& result) {
-    result.grid = p.grid;
-    result.path = p.path + 'U';
-    for (size_t i = 1; i < p.grid.size(); ++i) {
-        for (size_t j = 0; j < p.grid[i].size(); ++j) {
-            if (p.grid[i][j] == 'S' || p.grid[i][j] == 's') {
-                switch (p.grid[i-1][j]){
-                    case '#': // wall
-                        p.up = nullptr;
-                        return;
-                    case 'B': // box
-                    case 'R':
-                        if (p.grid[i-2][j] == '#' || p.grid[i-2][j] == 'B') { // wall or box behind the box
-                            p.up = nullptr; 
-                            return;
-                        } else if (p.grid[i-2][j] == 'T'){ // target behind the box
-                            result.grid[i-2][j] = 'R';
-                            result.grid[i-1][j] = (p.grid[i-1][j] == 'R') ? 's' : 'S';
-                            result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.';
-                            p.up = &result;
-                            return;
-                        } else { // box pushed
-                            result.grid[i-2][j] = 'B';
-                            result.grid[i-1][j] = (p.grid[i-1][j] == 'T' || p.grid[i-1][j] == 'R') ? 's' : 'S'; //Changed
-                            result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.';
-                            p.up = &result;
-                            return;
-                        }    
-                    case 'T':
-                        result.grid[i-1][j] = 's';
-                        result.grid[i][j] = '.';
-                        p.up = &result;
-                        return;
-                    case '.':
-                        result.grid[i-1][j] = 'S';
-                        result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.'; //Changed
-                        p.up = &result;
-                        return;
-                    default:
-                        return;
-                }
-            }
-        }
-    }
-}
-
-void get_down(position& p, position& result){
-    result.grid = p.grid;
-    result.path = p.path + "D";
-    for (size_t i = 1; i < p.grid.size(); ++i) {
-        for (size_t j = 0; j < p.grid[i].size(); ++j) {
-            if (p.grid[i][j] == 'S' || p.grid[i][j] == 's') {
-                switch (p.grid[i+1][j]){
-                    case '#': // wall
-                        p.down = nullptr;
-                        return;
-                    case 'B': // box
-                    case 'R':
-                        if (p.grid[i+2][j] == '#' || p.grid[i+2][j] == 'B') { // wall or box behind the box
-                            p.down = nullptr; 
-                            return;
-                        } else if (p.grid[i+2][j] == 'T'){ // target behind the box
-                            result.grid[i+2][j] = 'R';
-                            result.grid[i+1][j] = (p.grid[i+1][j] == 'R') ? 's' : 'S';
-                            result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.';
-                            p.down = &result;
-                            return;
-                        } else { // box pushed
-                            result.grid[i+2][j] = 'B';
-                            result.grid[i+1][j] = (p.grid[i+1][j] == 'T' || p.grid[i+1][j] == 'R') ? 's' : 'S';
-                            result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.';
-                            p.down = &result;
-                            return;
-                        }    
-                    case 'T':
-                        result.grid[i+1][j] = 's';
-                        result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.'; //Changed
-                        p.down = &result;
-                        return;
-                    case '.':
-                        result.grid[i+1][j] = 'S';
-                        result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.'; //Changed
-                        p.down = &result;
-                        return;
-                    default:
-                        break;
-                }
-            }
-        }
-    }
-}
-
-void get_left(position& p, position& result){
-    result.grid = p.grid;
-    result.path = p.path + 'L';
-    for (size_t i = 1; i < p.grid.size(); ++i) {
-        for (size_t j = 1; j < p.grid[i].size(); ++j) {
-            if (p.grid[i][j] == 'S' || p.grid[i][j] == 's') {
-                switch (p.grid[i][j-1]){
-                    case '#': // wall
-                        p.left = nullptr;
-                        break;
-                    case 'B': // box
-                    case 'R':
-                        if (p.grid[i][j-2] == '#' || p.grid[i][j-2] == 'B') { // wall or box behind the box
-                            p.left = nullptr; 
-                            break;
-                        } else if (p.grid[i][j-2] == 'T'){ // target behind the box
-                            result.grid[i][j-2] = 'R';
-                            result.grid[i][j-1] = (p.grid[i][j-1] == 'R') ? 's' : 'S';  
-                            result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.';
-                            p.left = &result;
-                            break;
-                        } else { // box pushed
-                            result.grid[i][j-2] = 'B';
-                            result.grid[i][j-1] = (p.grid[i][j-1] == 'T' || p.grid[i][j-1] == 'R') ? 's' : 'S';
-                            result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.';
-                            p.left = &result;
-                            break;
-                        }    
-                    case 'T':
-                        result.grid[i][j-1] = 's';
-                        result.grid[i][j] = '.';
-                        p.left = &result;
-                        break;
-                    case '.':
-                        result.grid[i][j-1] = 'S';
-                        result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.';
-                        p.left = &result;
-                        break;
-                    default:
-                        break;
-                }
-            }
-        }
-    }
-}
-
-void get_right(position& p, position& result){
-    result.grid = p.grid;
-    result.path = p.path + 'R';
-    for (size_t i = 1; i < p.grid.size(); ++i) {
-        for (size_t j = 0; j < p.grid[i].size(); ++j) {
-            if (p.grid[i][j] == 'S' || p.grid[i][j] == 's') {
-                switch (p.grid[i][j+1]){
-                    case '#': // wall
-                        p.right = nullptr;
-                        return;
-                    case 'B': // box
-                    case 'R':
-                        if (p.grid[i][j+2] == '#' || p.grid[i][j+2] == 'B') { // wall or box behind the box
-                            p.right = nullptr; 
-                            return;
-                        } else if (p.grid[i][j+2] == 'T'){ // target behind the box
-                            result.grid[i][j+2] = 'R';
-                            result.grid[i][j+1] = (p.grid[i][j+1] == 'R') ? 's' : 'S';
-                            result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.';
-                            p.right = &result;
-                            return;
-                        } else { // box pushed
-                            result.grid[i][j+2] = 'B';
-                            result.grid[i][j+1] = (p.grid[i][j+1] == 'T' || p.grid[i][j+1] == 'R') ? 's' : 'S';
-                            result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.';
-                            p.right = &result;
-                            return;
-                        }    
-                    case 'T':
-                        result.grid[i][j+1] = 's';
-                        result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.'; //Changed
-                        p.right = &result;
-                        return;
-                    case '.':
-                        result.grid[i][j+1] = 'S';
-                        result.grid[i][j] = (p.grid[i][j] == 's') ? 'T' : '.'; //Changed
-                        p.right = &result;
-                        return;
-                    default:
-                        break;
-                }
-            }
-        }
-    }
-}
-
-bool check_solved(std::vector<std::string> &grid) {
-    for (size_t i = 1; i < grid.size(); ++i) {
-        for (size_t j = 0; j < grid[i].size(); ++j) {
-            if (grid[i][j] == 'T' || grid[i][j] == 's') {
-                return false;
-            }
-        }
-    }
-    return true;
 }
