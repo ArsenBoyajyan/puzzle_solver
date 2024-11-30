@@ -8,8 +8,12 @@
 
 
 struct coordinate {
-    uint8_t x;
-    uint8_t y;
+    uint16_t x;
+    uint16_t y;
+
+    bool operator==(const coordinate& other) const {
+        return x == other.x && y == other.y;
+    }
 };
 
 bool check_invalide(const std::vector<std::string>& grid);
@@ -17,10 +21,10 @@ bool check_invalide(const std::vector<std::string>& grid);
 class state {
     public:
         state(std::vector<std::string> &grid) {
-            uint8_t rows = (uint8_t) grid.size();
-            uint8_t cols = (uint8_t) grid[0].size();
-            for (uint8_t i = 0; i < rows; ++i) {
-                for (uint8_t j = 0; j < cols; ++j) {
+            uint16_t rows = (uint16_t) grid.size();
+            uint16_t cols = (uint16_t) grid[0].size();
+            for (uint16_t i = 0; i < rows; ++i) {
+                for (uint16_t j = 0; j < cols; ++j) {
                     if (grid[i][j] == 'B' ) {
                         coordinate box = {j, i};
                         grid[i][j] = '.';
@@ -38,6 +42,12 @@ class state {
             }
         }
 
+        state(const state& other) {
+            path = other.path;
+            boxes = other.boxes;
+            player = other.player;
+        }
+
         state& operator=(const state& other) {
             path = other.path;
             boxes = other.boxes;
@@ -45,9 +55,9 @@ class state {
             return *this;
         }
 
-        // bool operator==(const state& other) const {
-        //     return boxes == other.boxes && player.x == other.player.x && player.y == other.player.y;
-        // }
+        bool operator==(const state& other) const {
+            return boxes == other.boxes && player.x == other.player.x && player.y == other.player.y;
+        }
 
         void add_path(char direction) {
             switch (direction) {
@@ -70,7 +80,7 @@ class state {
 
         std::string get_path() {
             std::string result;
-            for (uint8_t i = 0; i < path.size(); ++i) {
+            for (uint16_t i = 0; i < path.size(); ++i) {
                 switch (path[i].to_ulong()) {
                     case 0:
                         result += 'U';
@@ -134,7 +144,7 @@ class state {
                     }
                     
                     if (grid[box.y][box.x] == '#' || 
-                        std::any_of(result.boxes.begin(), result.boxes.end(), [&](coordinate b) { return b.x == box.x && b.y == box.y; })) {
+                        std::any_of(boxes.begin(), boxes.end(), [&](coordinate b) { return b.x == box.x && b.y == box.y; })) {
                         return *this; // Obstacle behind the box, do nothing
                     }
                 }
@@ -146,6 +156,9 @@ class state {
 
         bool check_deadlock(const std::vector<std::string> &grid) {
             for (auto& box : boxes) {
+                if (grid[box.y][box.x] == 'T') {
+                    return false;
+                }
                 bool top_wall = (grid[box.y-1][box.x] == '#');
                 bool bottom_wall = (grid[box.y+1][box.x] == '#');
                 bool left_wall = (grid[box.y][box.x-1] == '#');
@@ -174,38 +187,34 @@ class state {
             return true;
         }
 
-        // struct hash {
-        //     // size_t operator()(const state& s) const {
-        //     //     size_t result = 0;
-        //     //     for (const auto& box : s.boxes) {
-        //     //         result ^= std::hash<uint8_t>{}(box.x) + std::hash<uint8_t>{}(box.y);
-        //     //     }
-        //     //     result ^= std::hash<uint8_t>{}(s.player.x) + std::hash<uint8_t>{}(s.player.y);
-        //     //     return result;
-        //     // }
+        struct hash {
+            size_t operator()(const state& s) const {
+                size_t hash = 0;
+                unsigned char x, y;
+                for (const auto& box : s.boxes) {
+                    x = (unsigned char)box.x;
+                    y = (unsigned char)box.y;
+                    hash ^= std::hash<uint8_t>()(x) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+                    hash ^= std::hash<uint8_t>()(y) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+                }
+                x = (unsigned char)s.player.x;
+                y = (unsigned char)s.player.y;
+                hash ^= std::hash<uint8_t>()(x) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+                hash ^= std::hash<uint8_t>()(y) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+                return hash;
+            }
+        };
 
-        //     size_t operator()(const std::vector<coordinate>& boxes, const coordinate& player) const {
-        //         size_t hash = 0;
-        //         for (const auto& box : boxes) {
-        //             hash ^= std::hash<uint8_t>()(box.x) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-        //             hash ^= std::hash<uint8_t>()(box.y) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-        //         }
-        //         hash ^= std::hash<uint8_t>()(player.x) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-        //         hash ^= std::hash<uint8_t>()(player.y) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-        //         return hash;
-        //     }
-        // };
+        bool visit(std::unordered_set<state, hash> &visited) {
+            state s = *this;
+            if (visited.find(s) != visited.end()) {
+                return false;
+            }
+            visited.insert(s);
+            return true;
+        }
 
-        // bool visit(std::unordered_set<state, hash> &visited) {
-        //     state s = *this;
-        //     if (visited.find(s) != visited.end()) {
-        //         return false;
-        //     }
-        //     visited.insert(s);
-        //     return true;
-        // }
-
-        std::vector<std::string> return_grid(const std::vector<std::string> &grid) {
+        std::vector<std::string> get_grid(const std::vector<std::string> &grid) {
             std::vector<std::string> result;
             result = grid;
             for (auto& box : boxes) {
@@ -247,11 +256,13 @@ std::string solve(std::vector<std::string> &grid){
         return "No solution!";
     }
     state s(grid);
-    // std::unordered_set<state, state::hash> visited;
+    std::unordered_set<state, state::hash> visited;
     std::queue<state> q;
     q.push(s);
     while (!q.empty()) {
+        std::cout<<q.size()<<std::endl;
         state s = q.front();
+        std::vector<std::string> new_grid = s.get_grid(grid);
         q.pop();
         if (s.check_solved(grid)) {
             return s.get_path();
@@ -259,13 +270,7 @@ std::string solve(std::vector<std::string> &grid){
         if (s.check_deadlock(grid)) {
             continue;
         }
-        // if (s.visit(visited)) {
-        //     for (char direction : "UDLR") {
-        //         state new_state = s.move(grid, direction);
-        //         q.push(new_state);
-        //     }
-        // }
-        if (true) {
+        if (s.visit(visited)) {
             for (char direction : "UDLR") {
                 state new_state = s.move(grid, direction);
                 q.push(new_state);
@@ -342,8 +347,8 @@ bool check_invalide(const std::vector<std::string>& grid) {
                     (top_wall && right_wall && grid[i-1][j+1] == '#') ||
                     (bottom_wall && left_wall && grid[i+1][j-1] == '#') ||
                     (bottom_wall && right_wall && grid[i+1][j+1] == '#')) {
-                    return true;
-                }
+                        return true;
+                    }
             }
         }
     }
