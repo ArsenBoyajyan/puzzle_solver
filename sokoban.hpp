@@ -62,13 +62,14 @@ bool check_invalide(const std::vector<std::string>& grid);
 class state {
 
     public:
-        state() : parent(nullptr) {}
+        state() : first(true) {}
 
         state(std::vector<std::string> &grid) {
             uint16_t rows = (uint16_t) grid.size();
             uint16_t cols = (uint16_t) grid[0].size();
             size = cols;
-            parent = nullptr;
+            // set_direction('U');
+            first = true;
             path = std::vector<std::bitset<2>>();
             for (uint16_t i = 0; i < rows; ++i) {
                 for (uint16_t j = 0; j < cols; ++j) {
@@ -90,13 +91,14 @@ class state {
         }
 
         state(const state& other) 
-            : boxes(other.boxes), player(other.player), parent(other.parent), path(other.path) {
+            : boxes(other.boxes), player(other.player), /*parent(other.parent),*/ path(other.path), first(other.first) {
         }
 
         state& operator=(const state& other) {
-            parent = other.parent;
+            // parent = other.parent;
             boxes = other.boxes;
             player = other.player;
+            first = other.first;
             path = other.path;
             return *this;
         }
@@ -105,7 +107,7 @@ class state {
             return boxes == other.boxes && player.get_x() == other.player.get_x() && player.get_y() == other.player.get_y();
         }
 
-        std::string get_path() {
+        std::string get_path(const std::vector<std::string> &grid) {
             // std::string result;
             // state* current = this;
             // while (current->parent != nullptr) {
@@ -147,12 +149,21 @@ class state {
                 }
             }
             return result;
+
+            // std::string result;
+            // state current = *this;
+            // while (!current.first) {
+            //     std::cout<<current.get_direction()<<std::endl;
+            //     result.push_back(current.direction.to_ulong());
+            //     current = current.back_track(grid);
+            // }
+            // return result;
         }
 
         state move (const std::vector<std::string> &grid, char direction) {
             state result = *this;
-            result.parent = this;
             add_path(direction);
+            // set_direction(direction);
             switch (direction) {
                 case 'U':
                     result.player = result.player.upper();
@@ -200,8 +211,59 @@ class state {
                 }
             }
 
+            // result.parent = this;
+
             return result;
         }
+
+        // state back_track(const std::vector<std::string> &grid) {
+        //     state result = *this;
+        //     // char dir = get_direction();
+        //     // Restore previous state by reversing the direction
+        //     switch (dir) {
+        //         case 'U':
+        //             result.player = result.player.lower();
+        //             break;
+        //         case 'D':
+        //             result.player = result.player.upper();
+        //             break;
+        //         case 'L':
+        //             result.player = result.player.right();
+        //             break;
+        //         case 'R':
+        //             result.player = result.player.left();
+        //             break;
+        //         default:
+        //             break;
+        //     }
+
+        //     for (auto& box : result.boxes) {
+        //         if (box.get_x() == result.player.get_x() && box.get_y() == result.player.get_y()) {
+        //             switch (dir) {
+        //             case 'U':
+        //                 box = box.lower();
+        //                 break;
+        //             case 'D':
+        //                 box = box.upper();
+        //                 break;
+        //             case 'L':
+        //                 box = box.right();
+        //                 break;
+        //             case 'R':
+        //                 box = box.left();
+        //                 break;
+        //             default:
+        //                 break;
+        //             }
+        //             if (grid[box.get_y()][box.get_x()] == '#' || 
+        //                 std::any_of(boxes.begin(), boxes.end(), [&](coordinate b) { return b.get_x() == box.get_x() && b.get_y() == box.get_y(); })) {
+        //                 return *this; // Obstacle behind the box, do nothing
+        //             }
+        //         }
+        //     }
+
+        //     return result;
+        // }
 
         bool check_deadlock(const std::vector<std::string> &grid) {
             for (auto& box : boxes) {
@@ -272,12 +334,51 @@ class state {
             result[player.get_y()][player.get_x()] = 'S';
             return result;
         }
+    
+        
     private:
+        // state* parent;
         std::vector<coordinate> boxes;
         coordinate player;
-        state* parent;
-        std::vector<std::bitset<2>> path; // 00: up, 01: down, 10: left, 11: right
+        bool first;
         
+        std::vector<std::bitset<2>> path; // 00: up, 01: down, 10: left, 11: right
+        // std::bitset<2> direction; // 00: up, 01: down, 10: left, 11: right
+        
+        // void set_direction(char direction) {
+        //     first = false;
+        //     switch (direction) {
+        //         case 'U':
+        //             this->direction = std::bitset<2>(0);
+        //             break;
+        //         case 'D':
+        //             this->direction = std::bitset<2>(1);
+        //             break;
+        //         case 'L':
+        //             this->direction = std::bitset<2>(2);
+        //             break;
+        //         case 'R':
+        //             this->direction = std::bitset<2>(3);
+        //             break;
+        //         default:
+        //             break;
+        //     }
+        // }
+
+        // char get_direction() {
+        //     switch (direction.to_ulong()) {
+        //         case 0:
+        //             return 'U';
+        //         case 1:
+        //             return 'D';
+        //         case 2:
+        //             return 'L';
+        //         case 3:
+        //             return 'R';
+        //         default:
+        //             return ' ';
+        //     }
+        // }
         void add_path(char direction) {
             switch (direction) {
                 case 'U':
@@ -338,8 +439,9 @@ std::string solve(std::vector<std::string> &grid){
         if (current_state.visit(visited)) {
             for (char direction : "DRUL") {
                 state new_state = current_state.move(grid, direction);
+                print_grid(new_state.get_grid(grid));
                 if (new_state.check_solved(grid)) {
-                    return new_state.get_path();
+                    return new_state.get_path(grid);
                 }
                 if (!new_state.check_deadlock(grid)) {
                     q.push(new_state);
@@ -432,7 +534,7 @@ bool check_invalide(const std::vector<std::string>& grid) {
 }
 
 void print_grid(std::vector<std::string> grid) {
-    for (int i = 0; i < (int)grid.size(); ++i) {
+    for (unsigned long i = 0; i < grid.size(); ++i) {
         std::cout << grid[i] << std::endl;
     }
 }
