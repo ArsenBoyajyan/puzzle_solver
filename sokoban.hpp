@@ -4,123 +4,197 @@
 #include <unordered_set>
 #include <queue>
 #include <algorithm>
+#include <bitset>
+
+uint16_t size;
+void print_grid(std::vector<std::string> grid);
 
 
-struct coordinate {
-    uint16_t x;
-    uint16_t y;
+class coordinate {
+
+    public:
+
+    coordinate() : index(0) {}
+
+    coordinate(uint16_t x, uint16_t y) : index( (uint16_t)  (y * size + x)) {}
+
+    coordinate(const coordinate& other) : index(other.index) {}
+
+    uint16_t get_x() const {
+        return index % size;
+    }
+
+    uint16_t get_y() const {
+        return index / size;
+    }
 
     bool operator==(const coordinate& other) const {
-        return x == other.x && y == other.y;
+        return index == other.index;
     }
+
+    coordinate& operator=(const coordinate& other) {
+        index = other.index;
+        return *this;
+    }
+
+    coordinate upper() const {
+        return coordinate(get_x(), get_y() - 1);
+    }
+
+    coordinate lower() const {
+        return coordinate(get_x(), get_y() + 1);
+    }
+
+    coordinate left() const {
+        return coordinate(get_x() - 1, get_y());
+    }
+
+    coordinate right() const {
+        return coordinate(get_x() + 1, get_y());
+    }
+
+    private:
+        uint16_t index;
 };
 
 bool check_invalide(const std::vector<std::string>& grid);
 
 class state {
+
     public:
+        state() : parent(nullptr) {}
+
         state(std::vector<std::string> &grid) {
             uint16_t rows = (uint16_t) grid.size();
             uint16_t cols = (uint16_t) grid[0].size();
+            size = cols;
             parent = nullptr;
+            path = std::vector<std::bitset<2>>();
             for (uint16_t i = 0; i < rows; ++i) {
                 for (uint16_t j = 0; j < cols; ++j) {
                     if (grid[i][j] == 'B' ) {
-                        coordinate box = {j, i};
+                        coordinate box = coordinate(j, i);
                         grid[i][j] = '.';
                         boxes.push_back(box);
                     }
                     if (grid[i][j] == 'S') {
-                        player = {j, i};
+                        player = coordinate(j, i);
                         grid[i][j] = '.';
                     }
                     if (grid[i][j] == 'R') {
                         grid[i][j] = 'T';
-                        boxes.push_back({j, i});
+                        boxes.push_back(coordinate(j, i));
                     }
                 }
             }
         }
 
         state(const state& other) 
-            : boxes(other.boxes), player(other.player), parent(other.parent) {
+            : boxes(other.boxes), player(other.player), parent(other.parent), path(other.path) {
         }
 
         state& operator=(const state& other) {
             parent = other.parent;
             boxes = other.boxes;
             player = other.player;
+            path = other.path;
             return *this;
         }
 
         bool operator==(const state& other) const {
-            return boxes == other.boxes && player.x == other.player.x && player.y == other.player.y;
+            return boxes == other.boxes && player.get_x() == other.player.get_x() && player.get_y() == other.player.get_y();
         }
 
         std::string get_path() {
+            // std::string result;
+            // state* current = this;
+            // while (current->parent != nullptr) {
+            //     coordinate parent_player = current->parent->player;
+            //     if (current->player.get_y() < parent_player.get_y()) {
+            //         result.push_back('U');
+            //     } else if (current->player.get_y() > parent_player.get_y()) {
+            //         result.push_back('D');
+            //     } else if (current->player.get_x() < parent_player.get_x()) {
+            //         result.push_back('L');
+            //     } else if (current->player.get_x() > parent_player.get_x()) {
+            //         result.push_back('R');
+            //     } else {
+            //         std::cout<< "fuck";
+            //         break;
+            //     }
+            //     current = current->parent;
+            // }
+            // std::reverse(result.begin(), result.end());
+            // return result;
+
             std::string result;
-            state* current = this;
-            while (current->parent != nullptr) {
-                coordinate parent_player = current->parent->player;
-                if (current->player.y < parent_player.y) {
-                    result.push_back('U');
-                } else if (current->player.y > parent_player.y) {
-                    result.push_back('D');
-                } else if (current->player.x < parent_player.x) {
-                    result.push_back('L');
-                } else if (current->player.x > parent_player.x) {
-                    result.push_back('R');
+            for (auto& direction : this->path) {
+                switch (direction.to_ulong()) {
+                    case 0:
+                        result.push_back('U');
+                        break;
+                    case 1:
+                        result.push_back('D');
+                        break;
+                    case 2:
+                        result.push_back('L');
+                        break;
+                    case 3:
+                        result.push_back('R');
+                        break;
+                    default:
+                        break;
                 }
-                current = current->parent;
             }
-            std::reverse(result.begin(), result.end());
             return result;
         }
+
         state move (const std::vector<std::string> &grid, char direction) {
             state result = *this;
             result.parent = this;
+            add_path(direction);
             switch (direction) {
                 case 'U':
-                    result.player.y = result.player.y - 1;
+                    result.player = result.player.upper();
                     break;
                 case 'D':
-                    result.player.y = result.player.y + 1;
+                    result.player = result.player.lower();
                     break;
                 case 'L':
-                    result.player.x = result.player.x - 1;
+                    result.player = result.player.left();
                     break;
                 case 'R':
-                    result.player.x = result.player.x + 1;
+                    result.player = result.player.right();
                     break;
                 default:
                     break;
             }
 
-            if (grid[result.player.y][result.player.x] == '#') {
+            if (grid[result.player.get_y()][result.player.get_x()] == '#') {
                 return *this; // Wall, do nothing
             }
 
             for (auto& box : result.boxes) {
-                if (box.x == result.player.x && box.y == result.player.y) {
+                if (box.get_x() == result.player.get_x() && box.get_y() == result.player.get_y()) {
                     switch (direction) {
                         case 'U':
-                            box.y = box.y - 1;
+                            box = box.upper();
                             break;
                         case 'D':
-                            box.y = box.y + 1;
+                            box = box.lower();
                             break;
                         case 'L':
-                            box.x = box.x - 1;
+                            box = box.left();
                             break;
                         case 'R':
-                            box.x = box.x + 1;
+                            box = box.right();
                             break;
                         default:
                             break;
                     }
                     
-                    if (grid[box.y][box.x] == '#' || 
-                        std::any_of(boxes.begin(), boxes.end(), [&](coordinate b) { return b.x == box.x && b.y == box.y; })) {
+                    if (grid[box.get_y()][box.get_x()] == '#' || 
+                        std::any_of(boxes.begin(), boxes.end(), [&](coordinate b) { return b.get_x() == box.get_x() && b.get_y() == box.get_y(); })) {
                         return *this; // Obstacle behind the box, do nothing
                     }
                 }
@@ -129,25 +203,24 @@ class state {
             return result;
         }
 
-        
         bool check_deadlock(const std::vector<std::string> &grid) {
             for (auto& box : boxes) {
-                if (grid[box.y][box.x] == 'T') {
+                if (grid[box.get_y()][box.get_x()] == 'T') {
                     return false;
                 }
-                bool top_wall = (grid[box.y-1][box.x] == '#');
-                bool bottom_wall = (grid[box.y+1][box.x] == '#');
-                bool left_wall = (grid[box.y][box.x-1] == '#');
-                bool right_wall = (grid[box.y][box.x+1] == '#');
+                bool top_wall = (grid[box.get_y()-1][box.get_x()] == '#');
+                bool bottom_wall = (grid[box.get_y()+1][box.get_x()] == '#');
+                bool left_wall = (grid[box.get_y()][box.get_x()-1] == '#');
+                bool right_wall = (grid[box.get_y()][box.get_x()+1] == '#');
 
                 if ((top_wall || bottom_wall) && (left_wall || right_wall)) {
                     return true;
                 }
 
-                if ((top_wall && left_wall && grid[box.y - 1][box.x-1] == '#') || 
-                    (top_wall && right_wall && grid[box.y - 1][box.x + 1] == '#') ||
-                    (bottom_wall && left_wall && grid[box.y + 1][box.x - 1] == '#') ||
-                    (bottom_wall && right_wall && grid[box.y + 1][box.x + 1] == '#')) {
+                if ((top_wall && left_wall && grid[box.get_y() - 1][box.get_x()-1] == '#') || 
+                    (top_wall && right_wall && grid[box.get_y() - 1][box.get_x() + 1] == '#') ||
+                    (bottom_wall && left_wall && grid[box.get_y() + 1][box.get_x() - 1] == '#') ||
+                    (bottom_wall && right_wall && grid[box.get_y() + 1][box.get_x() + 1] == '#')) {
                     return true;
                 }
             }
@@ -156,7 +229,7 @@ class state {
 
         bool check_solved(const std::vector<std::string> &grid) {
             for (auto& box : boxes) {
-                if (grid[box.y][box.x] != 'T') {
+                if (grid[box.get_y()][box.get_x()] != 'T') {
                     return false;
                 }
             }
@@ -168,13 +241,13 @@ class state {
                 size_t hash = 0;
                 unsigned char x, y;
                 for (const auto& box : s.boxes) {
-                    x = (unsigned char)box.x;
-                    y = (unsigned char)box.y;
+                    x = (unsigned char)box.get_x();
+                    y = (unsigned char)box.get_y();
                     hash ^= std::hash<uint8_t>()(x) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
                     hash ^= std::hash<uint8_t>()(y) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
                 }
-                x = (unsigned char)s.player.x;
-                y = (unsigned char)s.player.y;
+                x = (unsigned char)s.player.get_x();
+                y = (unsigned char)s.player.get_y();
                 hash ^= std::hash<uint8_t>()(x) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
                 hash ^= std::hash<uint8_t>()(y) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
                 return hash;
@@ -194,16 +267,35 @@ class state {
             std::vector<std::string> result;
             result = grid;
             for (auto& box : boxes) {
-                result[box.y][box.x] = 'B';
+                result[box.get_y()][box.get_x()] = 'B';
             }
-            result[player.y][player.x] = 'S';
+            result[player.get_y()][player.get_x()] = 'S';
             return result;
         }
     private:
         std::vector<coordinate> boxes;
         coordinate player;
         state* parent;
+        std::vector<std::bitset<2>> path; // 00: up, 01: down, 10: left, 11: right
         
+        void add_path(char direction) {
+            switch (direction) {
+                case 'U':
+                    path.push_back(std::bitset<2>(0));
+                    break;
+                case 'D':
+                    path.push_back(std::bitset<2>(1));
+                    break;
+                case 'L':
+                    path.push_back(std::bitset<2>(2));
+                    break;
+                case 'R':
+                    path.push_back(std::bitset<2>(3));
+                    break;
+                default:
+                    break;
+            }
+        }
 };
 
 /**
@@ -244,7 +336,7 @@ std::string solve(std::vector<std::string> &grid){
         q.pop();
 
         if (current_state.visit(visited)) {
-            for (char direction : "UDLR") {
+            for (char direction : "DRUL") {
                 state new_state = current_state.move(grid, direction);
                 if (new_state.check_solved(grid)) {
                     return new_state.get_path();
@@ -337,4 +429,10 @@ bool check_invalide(const std::vector<std::string>& grid) {
     }
 
     return false;
+}
+
+void print_grid(std::vector<std::string> grid) {
+    for (int i = 0; i < (int)grid.size(); ++i) {
+        std::cout << grid[i] << std::endl;
+    }
 }
