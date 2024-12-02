@@ -5,9 +5,11 @@
 #include <queue>
 #include <algorithm>
 #include <bitset>
+#include <math.h>
 
 uint16_t size;
 void print_grid(std::vector<std::string> grid);
+bool check_invalid(const std::vector<std::string>& grid);
 
 
 class coordinate {
@@ -16,16 +18,18 @@ class coordinate {
 
     coordinate() : index(0) {}
 
-    coordinate(uint16_t x, uint16_t y) : index( (uint16_t)  (y * size + x)) {}
+    coordinate(uint16_t x, uint16_t y) {
+        index = std::bitset<7>(x + y * size);
+    }
 
     coordinate(const coordinate& other) : index(other.index) {}
 
     uint16_t get_x() const {
-        return index % size;
+        return get_value() % size;
     }
 
     uint16_t get_y() const {
-        return index / size;
+        return get_value() / size;
     }
 
     bool operator==(const coordinate& other) const {
@@ -54,10 +58,11 @@ class coordinate {
     }
 
     private:
-        uint16_t index;
+        std::bitset<7> index;
+        uint16_t get_value() const {
+            return static_cast<uint16_t>(index.to_ulong());
+        }
 };
-
-bool check_invalid(const std::vector<std::string>& grid);
 
 class state {
 
@@ -179,29 +184,80 @@ class state {
             return result;
         }
 
+        
+
+        // Hash for a vector of coordinates
+        struct VectorCoordinateHash {
+            std::size_t operator()(const std::vector<coordinate>& v) const {
+                std::size_t hash = 0;
+                for (const auto& coord : v) {
+                    // Combine the hashes of individual coordinates
+                    CoordinateHash coordinateHasher;
+                    hash ^= coordinateHasher(coord) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+                }
+                return hash;
+            }
+        };
+
         bool check_deadlock(const std::vector<std::string> &grid) {
             for (auto& box : boxes) {
+                // If the box is on a target, it's not a deadlock
                 if (grid[box.get_y()][box.get_x()] == 'T') {
-                    return false;
+                    continue;
                 }
+
+                // Walls around the box
                 bool top_wall = (grid[box.get_y()-1][box.get_x()] == '#');
                 bool bottom_wall = (grid[box.get_y()+1][box.get_x()] == '#');
                 bool left_wall = (grid[box.get_y()][box.get_x()-1] == '#');
                 bool right_wall = (grid[box.get_y()][box.get_x()+1] == '#');
 
+                // Simple corner deadlock
                 if ((top_wall || bottom_wall) && (left_wall || right_wall)) {
                     return true;
                 }
 
-                if ((top_wall && left_wall && grid[box.get_y() - 1][box.get_x()-1] == '#') || 
-                    (top_wall && right_wall && grid[box.get_y() - 1][box.get_x() + 1] == '#') ||
-                    (bottom_wall && left_wall && grid[box.get_y() + 1][box.get_x() - 1] == '#') ||
-                    (bottom_wall && right_wall && grid[box.get_y() + 1][box.get_x() + 1] == '#')) {
+                bool top_left_wall = (grid[box.get_y()-1][box.get_x()-1] == '#');
+                bool top_right_wall = (grid[box.get_y()-1][box.get_x()+1] == '#');
+                bool bottom_left_wall = (grid[box.get_y()+1][box.get_x()-1] == '#');
+                bool bottom_right_wall = (grid[box.get_y()+1][box.get_x()+1] == '#');
+
+                // L-shape or boxed-in structures
+                if ((top_wall && left_wall && bottom_left_wall) ||  // L-shape top-left
+                    (top_wall && right_wall && bottom_right_wall) || // L-shape top-right
+                    (bottom_wall && left_wall && top_left_wall) ||  // L-shape bottom-left
+                    (bottom_wall && right_wall && top_right_wall)) { // L-shape bottom-right
                     return true;
+                }
+
+                // Tightly packed boxes
+                for (auto& other_box : boxes) {
+                    if (box == other_box) continue; // Skip self
+
+                    // Packed horizontally
+                    if (box.get_y() == other_box.get_y() && 
+                        std::abs(box.get_x() - other_box.get_x()) == 1) {
+                        bool vertical_wall1 = (grid[box.get_y()-1][box.get_x()] == '#' || grid[box.get_y()+1][box.get_x()] == '#');
+                        bool vertical_wall2 = (grid[other_box.get_y()-1][other_box.get_x()] == '#' || grid[other_box.get_y()+1][other_box.get_x()] == '#');
+                        if (vertical_wall1 && vertical_wall2) {
+                            return true;
+                        }
+                    }
+
+                    // Packed vertically
+                    if (box.get_x() == other_box.get_x() &&
+                        std::abs(box.get_y() - other_box.get_y()) == 1) {
+                        bool horizontal_wall1 = (grid[box.get_y()][box.get_x()-1] == '#' || grid[box.get_y()][box.get_x()+1] == '#');
+                        bool horizontal_wall2 = (grid[other_box.get_y()][other_box.get_x()-1] == '#' || grid[other_box.get_y()][other_box.get_x()+1] == '#');
+                        if (horizontal_wall1 && horizontal_wall2) {
+                            return true;
+                        }
+                    }
                 }
             }
             return false;
         }
+
 
         bool check_solved(const std::vector<std::string> &grid) {
             for (auto& box : boxes) {
@@ -212,30 +268,31 @@ class state {
             return true;
         }
 
-        struct hash {
-            size_t operator()(const state& s) const {
-                size_t hash = 0;
-                unsigned char x, y;
-                for (const auto& box : s.boxes) {
-                    x = (unsigned char)box.get_x();
-                    y = (unsigned char)box.get_y();
-                    hash ^= std::hash<uint8_t>()(x) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-                    hash ^= std::hash<uint8_t>()(y) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-                }
-                x = (unsigned char)s.player.get_x();
-                y = (unsigned char)s.player.get_y();
-                hash ^= std::hash<uint8_t>()(x) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-                hash ^= std::hash<uint8_t>()(y) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-                return hash;
-            }
-        };
+        // struct hash {
+        //     size_t operator()(const state& s) const {
+        //         size_t hash = 0;
+        //         unsigned char x, y;
+        //         for (const auto& box : s.boxes) {
+        //             x = (unsigned char)box.get_x();
+        //             y = (unsigned char)box.get_y();
+        //             hash ^= std::hash<uint8_t>()(x) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        //             hash ^= std::hash<uint8_t>()(y) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        //         }
+        //         x = (unsigned char)s.player.get_x();
+        //         y = (unsigned char)s.player.get_y();
+        //         hash ^= std::hash<uint8_t>()(x) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        //         hash ^= std::hash<uint8_t>()(y) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        //         return hash;
+        //     }
+        // };
 
-        bool visit(std::unordered_set<state, hash> &visited) {
-            state s = *this;
-            if (visited.find(s) != visited.end()) {
+        bool visit(std::unordered_set<std::vector<coordinate>, VectorCoordinateHash> &visited) {
+            std::vector<coordinate> v = boxes;
+            v.push_back(player);
+            if (visited.find(v) != visited.end()) {
                 return false;
             }
-            visited.insert(s);
+            visited.insert(v);
             return true;
         }
 
@@ -275,6 +332,12 @@ class state {
                     break;
             }
         }
+
+        struct CoordinateHash {
+            std::size_t operator()(const coordinate& coord) const {
+                return std::hash<uint16_t>()(coord.get_x()) ^ (std::hash<uint16_t>()(coord.get_y()) << 1);
+            }
+        };
 };
 
 /**
@@ -306,7 +369,7 @@ std::string solve(std::vector<std::string> &grid){
     if (start.check_solved(grid)) {
         return "";
     }
-    std::unordered_set<state, state::hash> visited;
+    std::unordered_set<std::vector<coordinate>, state::VectorCoordinateHash> visited;
     std::queue<state> q;
     q.push(start);
     while (!q.empty()) {
