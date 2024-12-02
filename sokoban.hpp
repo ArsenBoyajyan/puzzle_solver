@@ -9,7 +9,6 @@
 #include <math.h>
 
 uint16_t size;
-void print_grid(std::vector<std::string> grid);
 bool check_invalid(const std::vector<std::string>& grid);
 
 class coordinate {
@@ -290,7 +289,11 @@ class state {
             std::vector<std::string> result;
             result = grid;
             for (auto& box : boxes) {
-                result[box.get_y()][box.get_x()] = 'B';
+                if (grid[box.get_y()][box.get_x()] == 'T') {
+                    result[box.get_y()][box.get_x()] = 'R';
+                } else {
+                    result[box.get_y()][box.get_x()] = 'B';
+                }
             }
             result[player.get_y()][player.get_x()] = 'S';
             return result;
@@ -529,10 +532,4 @@ bool check_invalid(const std::vector<std::string>& grid) {
     }
 
     return false;
-}
-
-void print_grid(std::vector<std::string> grid) {
-    for (unsigned long i = 0; i < grid.size(); ++i) {
-        std::cout << grid[i] << std::endl;
-    }
 }

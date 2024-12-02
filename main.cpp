@@ -4,58 +4,38 @@
 int main() {
     std::vector<std::string> grid;
     read_map(grid);
+    std::vector<std::string> grid_copy = grid;
 
     std::string result = solve(grid);
 
-    // position p;
-    // p.grid = grid;
+    state s(grid_copy);
 
-    // std::ofstream log("log.txt");
-    // if (result == "No solution!") {
-    //     log << "No solution!" << std::endl;
-    //     std::cout<<"No solution!" << std::endl;
-    //     return 0;
-    // }
-
-    // log << "Solved!!!:" << std::endl;
-
-    // for (int i = 0; i < (int)result.size(); ++i) {
-    //     switch(result[i]) {
-    //         case 'U':
-    //             get_up(p, p);
-    //             for (int j =0; j < (int)grid.size(); ++j) {
-    //                 log << p.grid[j] << std::endl;
-    //             }
-    //             log << "--------------------\n";
-    //             break;
-    //         case 'D':
-    //             get_down(p, p);
-    //             for (int j =0; j < (int)grid.size(); ++j) {
-    //                 log << p.grid[j] << std::endl;
-    //             }
-    //             log << "--------------------\n";
-    //             break;
-    //         case 'L':
-    //             get_left(p, p);
-    //             for (int j =0; j < (int)grid.size(); ++j) {
-    //                 log << p.grid[j] << std::endl;
-    //             }
-    //             log << "--------------------\n";
-    //             break;
-    //         case 'R':
-    //             get_right(p, p);
-    //             for (int j =0; j < (int)grid.size(); ++j) {
-    //                 log << p.grid[j] << std::endl;
-    //             }
-    //             log << "--------------------\n";
-    //             break;
-    //         default:
-    //             break;
-    //     }
-    // }
+    std::ofstream log("log.txt");
+    if (log.is_open()) {
+        if (result == "No solution!") {
+            log << "No solution!" << std::endl;
+            log.close();
+            return 0;
+        }
+        log << "Solved!!!\n";
+        for (char c : result) {
+            std::vector<std::string> temp_grid = s.get_grid(grid);
+            for (auto& line : temp_grid) {
+                log << line << std::endl;
+            }
+            log << "-----------------------\n";
+            s = s.move(temp_grid, c);
+        }
+        std::vector<std::string> temp_grid = s.get_grid(grid);
+        for (auto& line : temp_grid) {
+            log << line << std::endl;
+        }
+        log.close();
+    } else {
+        std::cout << "Unable to open log file" << std::endl;
+    }
 
     std::cout << result << std::endl;
 
-    // log.close();
     return 0;
 }
