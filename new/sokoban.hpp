@@ -166,6 +166,21 @@ class state {
         }
 
         bool check_deadlock(const std::vector<std::string> &grid) {
+            for (size_t i = 0; i < 8; ++i) {
+                coordinate box = get_box(i);
+                if (box.x == 0 || box.y == 0) break;
+                if (grid[box.y][box.x] == 'T') continue;
+                
+                // Check if there's a box on a corner
+                bool top_wall = (grid[box.y - 1][box.x] == '#');
+                bool bottom_wall = (grid[box.y + 1][box.x] == '#');
+                bool left_wall = (grid[box.y][box.x - 1] == '#');
+                bool right_wall = (grid[box.y][box.x + 1] == '#');
+
+                if ((top_wall || bottom_wall) && (left_wall || right_wall)) {
+                    return true; // Box is in a corner
+                }
+            }
             return false;
         }
 
@@ -185,7 +200,6 @@ class state {
         string get_path(unordered_map<std::bitset<72>, std::bitset<3>> &visited) {
             string path = "";
             state current = *this;
-            char d;
             bitset<3> value;
             while (current.get_player().x != start.x || current.get_player().y != start.y) {
                 value = visited[current.coordinates];
@@ -355,7 +369,7 @@ std::string solve(std::vector<std::string> &grid){
         q.pop();
 
         if (current_state.visit(visited)) {
-            for (char direction : "DRUL") {
+            for (char direction : "RDLU") {
                 if (direction == '\0') {
                     break;
                 }
