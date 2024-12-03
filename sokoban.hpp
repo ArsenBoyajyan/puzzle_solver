@@ -17,9 +17,7 @@ class coordinate {
 
     coordinate() : index(0) {}
 
-    coordinate(uint16_t x, uint16_t y) {
-        index = std::bitset<7>(x + y * size);
-    }
+    coordinate(uint16_t x, uint16_t y) : index(std::bitset<8>(x + y * size)) {}
 
     coordinate(const coordinate& other) : index(other.index) {}
 
@@ -61,7 +59,7 @@ class coordinate {
     }
 
     private:
-        std::bitset<7> index;
+        std::bitset<8> index;
         uint16_t get_value() const {
             return static_cast<uint16_t>(index.to_ulong());
         }
@@ -97,6 +95,7 @@ class state {
                     }
                 }
             }
+            boxes.shrink_to_fit();
         }
         state(const state& other) : boxes(other.boxes), player(other.player), direction(other.direction), pushed(other.pushed) {}
 
@@ -138,10 +137,10 @@ class state {
                 std::bitset<2> dir;
                 dir.set(0, info[0]);
                 dir.set(1, info[1]);
-                char direction = current_state.get_direction(dir);
-                path += direction;
-                bool pushed = info[2];
-                current_state = current_state.move_back(dir, pushed);
+                char c = current_state.get_direction(dir);
+                path += c;
+                bool with_box = info[2];
+                current_state = current_state.move_back(dir, with_box);
             }
             std::reverse(path.begin(), path.end());
             return path;
@@ -331,7 +330,7 @@ class state {
             }
         }
 
-        char get_direction(std::bitset<2> dir) {
+        char get_direction(const std::bitset<2> &dir) {
             switch (dir.to_ulong()) {
                 case 0:
                     return 'U';
@@ -347,7 +346,7 @@ class state {
         }
 
 
-        state move_back(std::bitset<2> d, bool with_box) {
+        state move_back(const std::bitset<2> &d, bool with_box) {
             state result = *this;
             coordinate check_box = coordinate(result.player.get_x(), result.player.get_y());
             switch (d.to_ulong()) {
@@ -425,13 +424,13 @@ std::string solve(std::vector<std::string> &grid){
     if (check_invalid(grid)) {
         return "No solution!";
     }
-    state start(grid);
-    if (start.check_solved(grid)) {
+    state s(grid);
+    if (s.check_solved(grid)) {
         return "";
     }
     std::unordered_map<std::vector<coordinate>, std::bitset<3>, state::VectorCoordinateHash> visited;
     std::queue<state> q;
-    q.push(start);
+    q.push(s);
     while (!q.empty()) {
         
         state current_state = q.front();
