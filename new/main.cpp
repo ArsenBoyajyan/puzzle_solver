@@ -9,7 +9,7 @@ int main() {
     std::string result = solve(grid);
 
     state s;
-    s.init(grid);
+    s.init(grid_copy);
 
     std::ofstream log("log.txt");
     if (log.is_open()) {

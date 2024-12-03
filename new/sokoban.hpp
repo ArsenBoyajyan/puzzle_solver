@@ -12,6 +12,13 @@ using namespace std;
 size_t grid_size;
 bool check_invalid(const std::vector<std::string>& grid);
 
+struct coordinate {
+    size_t x;
+    size_t y;
+};
+
+coordinate start;
+
 /**
  * @brief  Read your map from stdin
  * @note   Input format: See project description
@@ -29,7 +36,7 @@ void read_map(std::vector<std::string> &grid) {
 
 class state {
     public:
-        state() : coordinates(bitset<72>()), direction(bitset<2>()), pushed(false) {}
+        state() : coordinates(bitset<72>()), direction(bitset<2>()), pushed() {}
 
         state(const state &other) : coordinates(other.coordinates), direction(other.direction), pushed(other.pushed) {}
 
@@ -63,6 +70,8 @@ class state {
                         grid[i][j] = '.';
                     }
                     if (grid[i][j] == 'S') {
+                        start.x = j;
+                        start.y = i;
                         set_player(j, i);
                         grid[i][j] = '.';
                     }
@@ -107,7 +116,7 @@ class state {
                 coordinate box = get_box(i);
                 if (box.x == 0 || box.y == 0) break;
                 if (box.x == current_player.x && box.y == current_player.y) {
-                    pushed = true;
+                    result.pushed = true;
                     switch (d) {
                         case 'D':
                             result.set_box(i, current_player.x, current_player.y + 1);
@@ -173,34 +182,22 @@ class state {
             }
         }
 
-        string get_path(unordered_map<std::bitset<72>, std::bitset<3>> &visited, const vector<string> &grid) {
-            string result = "";
+        string get_path(unordered_map<std::bitset<72>, std::bitset<3>> &visited) {
+            string path = "";
             state current = *this;
-            bool with_box;
-            char d = get_direction();
-            result += d;
-            
-            while (true) {
-                vector<string> new_grid;
-                new_grid = current.get_grid(grid);
-                for (auto &row : new_grid) {
-                    cout << row << endl;
-                }
-                if (visited.find(current.coordinates) == visited.end()) {
-                    break;
-                }
-                std::bitset<3> info = visited[current.coordinates];
-                with_box = info[2];
-                bitset<2> new_direction;
-                new_direction.set(0, info[0]);
-                new_direction.set(1, info[1]);
-                current.direction = new_direction;
-                current.pushed = with_box;
-                result += d;
+            char d;
+            bitset<3> value;
+            while (current.get_player().x != start.x || current.get_player().y != start.y) {
+                value = visited[current.coordinates];
+                current.direction.set(0, value[0]);
+                current.direction.set(1, value[1]);
+                path += current.get_direction();
+                current.pushed = value[2];
                 current = current.move_back();
             }
-            reverse(result.begin(), result.end());
-            return result;
+            // Reverse the path
+            std::reverse(path.begin(), path.end());
+            return path;
         }
     
         vector<string> get_grid(const vector<string> &grid) {
@@ -222,11 +219,6 @@ class state {
         bitset<72> coordinates;
         bitset<2> direction; // 0: up, 1: down, 2: left, 3: right
         bool pushed = false;
-
-        struct coordinate {
-            size_t x;
-            size_t y;
-        };
 
         coordinate get_player() const {
             coordinate result;
@@ -300,7 +292,6 @@ class state {
             coordinate current_player = get_player();
             coordinate box_location;
             char d = get_direction();
-            cout<<"direction: "<<d<<"\n";
             switch (d) {
                 case 'U':
                     result.set_player(current_player.x, current_player.y + 1);
@@ -371,7 +362,7 @@ std::string solve(std::vector<std::string> &grid){
                 state new_state = current_state.move(grid, direction);
                 if (new_state.check_win(grid)) {
                     new_state.visit(visited);
-                    return new_state.get_path(visited, grid);
+                    return new_state.get_path(visited);
                 }
                 if (!new_state.check_deadlock(grid)) {
                     q.push(new_state);
