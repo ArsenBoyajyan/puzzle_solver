@@ -29,6 +29,14 @@ class coordinate {
         return get_value() / size;
     }
 
+    std::bitset<8> get_index() const {
+        return index;
+    }
+
+    void set_index(const std::bitset<8>& index) {
+        this->index = index;
+    }
+
     bool operator==(const coordinate& other) const {
         return index == other.index;
     }
@@ -65,18 +73,88 @@ class coordinate {
         }
 };
 
+
+class data {
+public:
+    // Constructor
+    data() : value(0) {}
+
+    data(const data& other) : value(other.value) {}
+
+    bool operator==(const data& other) const {
+        return value == other.value;
+    }
+
+    data &operator=(const data &other) {
+        value = other.value;
+        return *this;
+    }
+
+    std::bitset<72> get_value() const {
+        return value;
+    }
+
+    // Sets the first 64 bits to store the boxes
+    void set_boxes(const std::vector<coordinate>& boxes) {
+        value &= ~std::bitset<72>(std::bitset<64>().set().to_ullong());
+
+        size_t count = std::min(boxes.size(), static_cast<size_t>(8));
+
+        for (size_t i = 0; i < count; ++i) {
+            std::bitset<8> box_index = boxes[i].get_index();
+
+            value |= (std::bitset<72>(box_index.to_ulong()) << (i * 8));
+        }
+    }
+
+    void set_player(const coordinate& player) {
+        value &= ~std::bitset<72>(0xFF); // Mask to clear the last 8 bits
+
+        std::bitset<8> player_index = player.get_index();
+
+        value |= std::bitset<72>(player_index.to_ulong());
+    }
+
+    std::vector<coordinate> get_boxes() const {
+        std::vector<coordinate> boxes;
+
+        for (size_t i = 0; i < 8; ++i) {
+            uint64_t box_index = (value >> (i * 8)).to_ulong() & 0xFF;
+            if (box_index == 0) break;
+            coordinate box;
+            box.set_index(std::bitset<8>(box_index));
+            boxes.push_back(box);
+        }
+
+        return boxes;
+    }
+    coordinate get_player() const {
+        uint64_t player_index = (value.to_ulong() & 0xFF);
+        coordinate player;
+        player.set_index(std::bitset<8>(player_index));
+
+        return player;
+    }
+
+private:
+    std::bitset<72> value; // Stores the boxes and player
+};
+
 coordinate start;
 
 class state {
 
     public:
-        state() : boxes(std::vector<coordinate>()), player(coordinate()), direction(std::bitset<2>()), pushed(false) {}
+        // state() : boxes(std::vector<coordinate>()), player(coordinate()), direction(std::bitset<2>()), pushed(false) {}
+        state() : info(data()), direction(std::bitset<2>()), pushed(false) {}
 
         state(std::vector<std::string> &grid) {
             uint16_t rows = (uint16_t) grid.size();
             uint16_t cols = (uint16_t) grid[0].size();
-            pushed = false;
             size = cols;
+            std::vector<coordinate> boxes;
+            coordinate player;
+            pushed = false;
             for (uint16_t i = 0; i < rows; ++i) {
                 for (uint16_t j = 0; j < cols; ++j) {
                     if (grid[i][j] == 'B' ) {
@@ -95,40 +173,47 @@ class state {
                     }
                 }
             }
-            boxes.shrink_to_fit();
+            info.set_boxes(boxes);
+            info.set_player(player);
         }
-        state(const state& other) : boxes(other.boxes), player(other.player), direction(other.direction), pushed(other.pushed) {}
+        // state(const state& other) : boxes(other.boxes), player(other.player), direction(other.direction), pushed(other.pushed) {}
+        state(const state& other) : info(other.info), direction(other.direction), pushed(other.pushed) {}
 
         state& operator=(const state& other) {
-            boxes = other.boxes;
-            player = other.player;
+            // boxes = other.boxes;
+            // player = other.player;
+            info = other.info;
             direction = other.direction;
             pushed = other.pushed;
             return *this;
         }
 
         bool operator==(const state& other) const {
-            return boxes == other.boxes && player.get_x() == other.player.get_x() && player.get_y() == other.player.get_y();
+            // return boxes == other.boxes && player.get_x() == other.player.get_x() && player.get_y() == other.player.get_y();
+            return info == other.info;
         }
 
         // Hash for a vector of coordinates
-        struct VectorCoordinateHash {
-            std::size_t operator()(const std::vector<coordinate>& v) const {
-                std::size_t hash = 0;
-                for (const auto& coord : v) {
-                    CoordinateHash coordinateHasher;
-                    hash ^= coordinateHasher(coord) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-                }
-                return hash;
-            }
-        };
+        // struct VectorCoordinateHash {
+        //     std::size_t operator()(const std::vector<coordinate>& v) const {
+        //         std::size_t hash = 0;
+        //         for (const auto& coord : v) {
+        //             CoordinateHash coordinateHasher;
+        //             hash ^= coordinateHasher(coord) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        //         }
+        //         return hash;
+        //     }
+        // };
 
-        std::string get_path(std::unordered_map<std::vector<coordinate>, std::bitset<3>, VectorCoordinateHash> &visited) {
+        // std::string get_path(std::unordered_map<std::vector<coordinate>, std::bitset<3>, VectorCoordinateHash> &visited) {
+        std::string get_path(std::unordered_map<std::bitset<72>, std::bitset<3>> &visited) {
             std::string path = "";
             state current_state = *this;
-            while (current_state.player != start) {
-                std::vector<coordinate> v = current_state.boxes;
-                v.push_back(current_state.player);
+            coordinate player = current_state.info.get_player();
+            while (player != start) {
+                // std::vector<coordinate> v = current_state.boxes;
+                // v.push_back(current_state.player);
+                std::bitset<72> v = current_state.info.get_value();
                 auto it = visited.find(v);
                 if (it == visited.end()) {
                     return "error";
@@ -141,6 +226,7 @@ class state {
                 path += c;
                 bool with_box = info[2];
                 current_state = current_state.move_back(dir, with_box);
+                player = current_state.info.get_player();
             }
             std::reverse(path.begin(), path.end());
             return path;
@@ -152,27 +238,30 @@ class state {
             result.set_direction(direction);
             switch (direction) {
                 case 'U':
-                    result.player = result.player.upper();
+                    result.info.set_player(result.info.get_player().upper());   
                     break;
                 case 'D':
-                    result.player = result.player.lower();
+                    result.info.set_player(result.info.get_player().lower());
                     break;
                 case 'L':
-                    result.player = result.player.left();
+                    result.info.set_player(result.info.get_player().left());
                     break;
                 case 'R':
-                    result.player = result.player.right();
+                    result.info.set_player(result.info.get_player().right());
                     break;
                 default:
                     break;
             }
 
-            if (grid[result.player.get_y()][result.player.get_x()] == '#') {
+            if (grid[result.info.get_player().get_y()][result.info.get_player().get_x()] == '#') {
                 return *this; // Wall, do nothing
             }
 
-            for (auto& box : result.boxes) {
-                if (box.get_x() == result.player.get_x() && box.get_y() == result.player.get_y()) {
+            std::vector<coordinate> boxes = result.info.get_boxes();
+            coordinate player = result.info.get_player();
+
+            for (auto& box : boxes) {
+                if (box.get_x() == player.get_x() && box.get_y() == player.get_y()) {
                     result.pushed = true;
                     switch (direction) {
                         case 'U':
@@ -202,6 +291,7 @@ class state {
         }
 
         bool check_deadlock(const std::vector<std::string> &grid) {
+            std::vector<coordinate> boxes = info.get_boxes();
             for (auto& box : boxes) {
                 // If the box is on a target, it's not a deadlock
                 if (grid[box.get_y()][box.get_x()] == 'T') {
@@ -262,6 +352,7 @@ class state {
 
 
         bool check_solved(const std::vector<std::string> &grid) {
+            std::vector<coordinate> boxes = info.get_boxes();
             for (auto& box : boxes) {
                 if (grid[box.get_y()][box.get_x()] != 'T') {
                     return false;
@@ -270,9 +361,8 @@ class state {
             return true;
         }
 
-        bool visit(std::unordered_map<std::vector<coordinate>, std::bitset<3>, VectorCoordinateHash> &visited) {
-            std::vector<coordinate> v = boxes;
-            v.push_back(player);
+        bool visit(std::unordered_map<std::bitset<72>, std::bitset<3>> &visited) {
+            std::bitset<72> v = info.get_value();
             if (visited.find(v) != visited.end()) {
                 return false;
             }
@@ -287,6 +377,8 @@ class state {
         std::vector<std::string> get_grid(const std::vector<std::string> &grid) {
             std::vector<std::string> result;
             result = grid;
+            std::vector<coordinate> boxes = info.get_boxes();
+            coordinate player = info.get_player();
             for (auto& box : boxes) {
                 if (grid[box.get_y()][box.get_x()] == 'T') {
                     result[box.get_y()][box.get_x()] = 'R';
@@ -300,16 +392,17 @@ class state {
     
         
     private:
-        std::vector<coordinate> boxes;
-        coordinate player;
+        // std::vector<coordinate> boxes;
+        // coordinate player;
+        data info;
         std::bitset<2> direction; // 00: up, 01: down, 10: left, 11: right
         bool pushed;
 
-        struct CoordinateHash {
-            std::size_t operator()(const coordinate& coord) const {
-                return std::hash<uint16_t>()(coord.get_x()) ^ (std::hash<uint16_t>()(coord.get_y()) << 1);
-            }
-        };
+        // struct CoordinateHash {
+        //     std::size_t operator()(const coordinate& coord) const {
+        //         return std::hash<uint16_t>()(coord.get_x()) ^ (std::hash<uint16_t>()(coord.get_y()) << 1);
+        //     }
+        // };
 
         void set_direction(char d) {
             switch (d) {
@@ -348,22 +441,22 @@ class state {
 
         state move_back(const std::bitset<2> &d, bool with_box) {
             state result = *this;
-            coordinate check_box = coordinate(result.player.get_x(), result.player.get_y());
+            coordinate check_box = coordinate(result.info.get_player().get_x(), result.info.get_player().get_y());
             switch (d.to_ulong()) {
                 case 0:
-                    result.player = result.player.lower();
+                    result.info.set_player(result.info.get_player().lower());
                     check_box = check_box.upper();
                     break;
                 case 1:
-                    result.player = result.player.upper();
+                    result.info.set_player(result.info.get_player().upper());
                     check_box = check_box.lower();
                     break;
                 case 2:
-                    result.player = result.player.right();
+                    result.info.set_player(result.info.get_player().right());
                     check_box = check_box.left();
                     break;
                 case 3:
-                    result.player = result.player.left();
+                    result.info.set_player(result.info.get_player().left());
                     check_box = check_box.right();
                     break;
                 default:
@@ -371,7 +464,8 @@ class state {
             }
 
             if (with_box) {
-                for (auto& box : result.boxes) {
+                std::vector<coordinate> boxes = result.info.get_boxes();
+                for (auto& box : boxes) {
                     if (box.get_x() == check_box.get_x() && box.get_y() == check_box.get_y()) {
                         switch (d.to_ulong()) {
                             case 0:
@@ -391,6 +485,7 @@ class state {
                         }
                     }
                 }
+                result.info.set_boxes(boxes);
             }
 
             return result;
@@ -428,10 +523,11 @@ std::string solve(std::vector<std::string> &grid){
     if (s.check_solved(grid)) {
         return "";
     }
-    std::unordered_map<std::vector<coordinate>, std::bitset<3>, state::VectorCoordinateHash> visited;
+    std::unordered_map<std::bitset<72>, std::bitset<3>> visited;
     std::queue<state> q;
     q.push(s);
     while (!q.empty()) {
+        
         
         state current_state = q.front();
         q.pop();
