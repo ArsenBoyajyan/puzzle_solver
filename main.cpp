@@ -8,25 +8,27 @@ int main() {
 
     std::string result = solve(grid);
 
-    state s(grid_copy);
+    state s;
+    s.init(grid_copy);
 
     std::ofstream log("log.txt");
     if (log.is_open()) {
         if (result == "No solution!") {
             log << "No solution!" << std::endl;
+            cout << "No solution!" << std::endl;
             log.close();
             return 0;
         }
         log << "Solved!!!\n";
         for (char c : result) {
-            std::vector<std::string> temp_grid = s.get_grid(grid);
+            std::vector<std::string> temp_grid = s.get_grid(grid_copy);
             for (auto& line : temp_grid) {
                 log << line << std::endl;
             }
             log << "-----------------------\n";
             s = s.move(temp_grid, c);
         }
-        std::vector<std::string> temp_grid = s.get_grid(grid);
+        std::vector<std::string> temp_grid = s.get_grid(grid_copy);
         for (auto& line : temp_grid) {
             log << line << std::endl;
         }

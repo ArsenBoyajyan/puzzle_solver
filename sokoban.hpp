@@ -8,491 +8,10 @@
 #include <bitset>
 #include <math.h>
 
-uint16_t size;
+using namespace std;
+size_t grid_size;
 bool check_invalid(const std::vector<std::string>& grid);
-
-class coordinate {
-
-    public:
-
-    coordinate() : index(0) {}
-
-    coordinate(uint16_t x, uint16_t y) : index(std::bitset<8>(x + y * size)) {}
-
-    coordinate(const coordinate& other) : index(other.index) {}
-
-    uint16_t get_x() const {
-        return get_value() % size;
-    }
-
-    uint16_t get_y() const {
-        return get_value() / size;
-    }
-
-    std::bitset<8> get_index() const {
-        return index;
-    }
-
-    void set_index(const std::bitset<8>& index) {
-        this->index = index;
-    }
-
-    bool operator==(const coordinate& other) const {
-        return index == other.index;
-    }
-
-    coordinate& operator=(const coordinate& other) {
-        index = other.index;
-        return *this;
-    }
-
-    bool operator!=(const coordinate& other) const {
-        return !(*this == other);
-    }
-
-    coordinate upper() const {
-        return coordinate(get_x(), get_y() - 1);
-    }
-
-    coordinate lower() const {
-        return coordinate(get_x(), get_y() + 1);
-    }
-
-    coordinate left() const {
-        return coordinate(get_x() - 1, get_y());
-    }
-
-    coordinate right() const {
-        return coordinate(get_x() + 1, get_y());
-    }
-
-    private:
-        std::bitset<8> index;
-        uint16_t get_value() const {
-            return static_cast<uint16_t>(index.to_ulong());
-        }
-};
-
-
-class data {
-public:
-    // Constructor
-    data() : value(0) {}
-
-    data(const data& other) : value(other.value) {}
-
-    bool operator==(const data& other) const {
-        return value == other.value;
-    }
-
-    data &operator=(const data &other) {
-        value = other.value;
-        return *this;
-    }
-
-    std::bitset<72> get_value() const {
-        return value;
-    }
-
-    // Sets the first 64 bits to store the boxes
-    void set_boxes(const std::vector<coordinate>& boxes) {
-        value &= ~std::bitset<72>(std::bitset<64>().set().to_ullong());
-
-        size_t count = std::min(boxes.size(), static_cast<size_t>(8));
-
-        for (size_t i = 0; i < count; ++i) {
-            std::bitset<8> box_index = boxes[i].get_index();
-
-            value |= (std::bitset<72>(box_index.to_ulong()) << (i * 8));
-        }
-    }
-
-    void set_player(const coordinate& player) {
-        value &= ~std::bitset<72>(0xFF); // Mask to clear the last 8 bits
-
-        std::bitset<8> player_index = player.get_index();
-
-        value |= std::bitset<72>(player_index.to_ulong());
-    }
-
-    std::vector<coordinate> get_boxes() const {
-        std::vector<coordinate> boxes;
-
-        for (size_t i = 0; i < 8; ++i) {
-            uint64_t box_index = (value >> (i * 8)).to_ulong() & 0xFF;
-            if (box_index == 0) break;
-            coordinate box;
-            box.set_index(std::bitset<8>(box_index));
-            boxes.push_back(box);
-        }
-
-        return boxes;
-    }
-    coordinate get_player() const {
-        uint64_t player_index = (value.to_ulong() & 0xFF);
-        coordinate player;
-        player.set_index(std::bitset<8>(player_index));
-
-        return player;
-    }
-
-private:
-    std::bitset<72> value; // Stores the boxes and player
-};
-
-coordinate start;
-
-class state {
-
-    public:
-        // state() : boxes(std::vector<coordinate>()), player(coordinate()), direction(std::bitset<2>()), pushed(false) {}
-        state() : info(data()), direction(std::bitset<2>()), pushed(false) {}
-
-        state(std::vector<std::string> &grid) {
-            uint16_t rows = (uint16_t) grid.size();
-            uint16_t cols = (uint16_t) grid[0].size();
-            size = cols;
-            std::vector<coordinate> boxes;
-            coordinate player;
-            pushed = false;
-            for (uint16_t i = 0; i < rows; ++i) {
-                for (uint16_t j = 0; j < cols; ++j) {
-                    if (grid[i][j] == 'B' ) {
-                        coordinate box = coordinate(j, i);
-                        grid[i][j] = '.';
-                        boxes.push_back(box);
-                    }
-                    if (grid[i][j] == 'S') {
-                        player = coordinate(j, i);
-                        start = player;
-                        grid[i][j] = '.';
-                    }
-                    if (grid[i][j] == 'R') {
-                        grid[i][j] = 'T';
-                        boxes.push_back(coordinate(j, i));
-                    }
-                }
-            }
-            info.set_boxes(boxes);
-            info.set_player(player);
-        }
-        // state(const state& other) : boxes(other.boxes), player(other.player), direction(other.direction), pushed(other.pushed) {}
-        state(const state& other) : info(other.info), direction(other.direction), pushed(other.pushed) {}
-
-        state& operator=(const state& other) {
-            // boxes = other.boxes;
-            // player = other.player;
-            info = other.info;
-            direction = other.direction;
-            pushed = other.pushed;
-            return *this;
-        }
-
-        bool operator==(const state& other) const {
-            // return boxes == other.boxes && player.get_x() == other.player.get_x() && player.get_y() == other.player.get_y();
-            return info == other.info;
-        }
-
-        // Hash for a vector of coordinates
-        // struct VectorCoordinateHash {
-        //     std::size_t operator()(const std::vector<coordinate>& v) const {
-        //         std::size_t hash = 0;
-        //         for (const auto& coord : v) {
-        //             CoordinateHash coordinateHasher;
-        //             hash ^= coordinateHasher(coord) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-        //         }
-        //         return hash;
-        //     }
-        // };
-
-        // std::string get_path(std::unordered_map<std::vector<coordinate>, std::bitset<3>, VectorCoordinateHash> &visited) {
-        std::string get_path(std::unordered_map<std::bitset<72>, std::bitset<3>> &visited) {
-            std::string path = "";
-            state current_state = *this;
-            coordinate player = current_state.info.get_player();
-            while (player != start) {
-                // std::vector<coordinate> v = current_state.boxes;
-                // v.push_back(current_state.player);
-                std::bitset<72> v = current_state.info.get_value();
-                auto it = visited.find(v);
-                if (it == visited.end()) {
-                    return "error";
-                }
-                std::bitset<3> info = it->second;
-                std::bitset<2> dir;
-                dir.set(0, info[0]);
-                dir.set(1, info[1]);
-                char c = current_state.get_direction(dir);
-                path += c;
-                bool with_box = info[2];
-                current_state = current_state.move_back(dir, with_box);
-                player = current_state.info.get_player();
-            }
-            std::reverse(path.begin(), path.end());
-            return path;
-        }
-
-        state move (const std::vector<std::string> &grid, char direction) {
-            state result = *this;
-            result.pushed = false;
-            result.set_direction(direction);
-            switch (direction) {
-                case 'U':
-                    result.info.set_player(result.info.get_player().upper());   
-                    break;
-                case 'D':
-                    result.info.set_player(result.info.get_player().lower());
-                    break;
-                case 'L':
-                    result.info.set_player(result.info.get_player().left());
-                    break;
-                case 'R':
-                    result.info.set_player(result.info.get_player().right());
-                    break;
-                default:
-                    break;
-            }
-
-            if (grid[result.info.get_player().get_y()][result.info.get_player().get_x()] == '#') {
-                return *this; // Wall, do nothing
-            }
-
-            std::vector<coordinate> boxes = result.info.get_boxes();
-            coordinate player = result.info.get_player();
-
-            for (auto& box : boxes) {
-                if (box.get_x() == player.get_x() && box.get_y() == player.get_y()) {
-                    result.pushed = true;
-                    switch (direction) {
-                        case 'U':
-                            box = box.upper();
-                            break;
-                        case 'D':
-                            box = box.lower();
-                            break;
-                        case 'L':
-                            box = box.left();
-                            break;
-                        case 'R':
-                            box = box.right();
-                            break;
-                        default:
-                            break;
-                    }
-                    
-                    if (grid[box.get_y()][box.get_x()] == '#' || 
-                        std::any_of(boxes.begin(), boxes.end(), [&](coordinate b) { return b.get_x() == box.get_x() && b.get_y() == box.get_y(); })) {
-                        return *this; // Obstacle behind the box, do nothing
-                    }
-                }
-            }
-
-            return result;
-        }
-
-        bool check_deadlock(const std::vector<std::string> &grid) {
-            std::vector<coordinate> boxes = info.get_boxes();
-            for (auto& box : boxes) {
-                // If the box is on a target, it's not a deadlock
-                if (grid[box.get_y()][box.get_x()] == 'T') {
-                    continue;
-                }
-
-                // Walls around the box
-                bool top_wall = (grid[box.get_y()-1][box.get_x()] == '#');
-                bool bottom_wall = (grid[box.get_y()+1][box.get_x()] == '#');
-                bool left_wall = (grid[box.get_y()][box.get_x()-1] == '#');
-                bool right_wall = (grid[box.get_y()][box.get_x()+1] == '#');
-
-                // Simple corner deadlock
-                if ((top_wall || bottom_wall) && (left_wall || right_wall)) {
-                    return true;
-                }
-
-                bool top_left_wall = (grid[box.get_y()-1][box.get_x()-1] == '#');
-                bool top_right_wall = (grid[box.get_y()-1][box.get_x()+1] == '#');
-                bool bottom_left_wall = (grid[box.get_y()+1][box.get_x()-1] == '#');
-                bool bottom_right_wall = (grid[box.get_y()+1][box.get_x()+1] == '#');
-
-                // L-shape or boxed-in structures
-                if ((top_wall && left_wall && bottom_left_wall) ||  // L-shape top-left
-                    (top_wall && right_wall && bottom_right_wall) || // L-shape top-right
-                    (bottom_wall && left_wall && top_left_wall) ||  // L-shape bottom-left
-                    (bottom_wall && right_wall && top_right_wall)) { // L-shape bottom-right
-                    return true;
-                }
-
-                // Tightly packed boxes
-                for (auto& other_box : boxes) {
-                    if (box == other_box) continue; // Skip self
-
-                    // Packed horizontally
-                    if (box.get_y() == other_box.get_y() && 
-                        std::abs(box.get_x() - other_box.get_x()) == 1) {
-                        bool vertical_wall1 = (grid[box.get_y()-1][box.get_x()] == '#' || grid[box.get_y()+1][box.get_x()] == '#');
-                        bool vertical_wall2 = (grid[other_box.get_y()-1][other_box.get_x()] == '#' || grid[other_box.get_y()+1][other_box.get_x()] == '#');
-                        if (vertical_wall1 && vertical_wall2) {
-                            return true;
-                        }
-                    }
-
-                    // Packed vertically
-                    if (box.get_x() == other_box.get_x() &&
-                        std::abs(box.get_y() - other_box.get_y()) == 1) {
-                        bool horizontal_wall1 = (grid[box.get_y()][box.get_x()-1] == '#' || grid[box.get_y()][box.get_x()+1] == '#');
-                        bool horizontal_wall2 = (grid[other_box.get_y()][other_box.get_x()-1] == '#' || grid[other_box.get_y()][other_box.get_x()+1] == '#');
-                        if (horizontal_wall1 && horizontal_wall2) {
-                            return true;
-                        }
-                    }
-                }
-            }
-            return false;
-        }
-
-
-        bool check_solved(const std::vector<std::string> &grid) {
-            std::vector<coordinate> boxes = info.get_boxes();
-            for (auto& box : boxes) {
-                if (grid[box.get_y()][box.get_x()] != 'T') {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        bool visit(std::unordered_map<std::bitset<72>, std::bitset<3>> &visited) {
-            std::bitset<72> v = info.get_value();
-            if (visited.find(v) != visited.end()) {
-                return false;
-            }
-            std::bitset<3> info;
-            info.set(0, direction[0]);
-            info.set(1, direction[1]);
-            info.set(2, pushed);
-            visited.insert({v, info});
-            return true;
-        }
-
-        std::vector<std::string> get_grid(const std::vector<std::string> &grid) {
-            std::vector<std::string> result;
-            result = grid;
-            std::vector<coordinate> boxes = info.get_boxes();
-            coordinate player = info.get_player();
-            for (auto& box : boxes) {
-                if (grid[box.get_y()][box.get_x()] == 'T') {
-                    result[box.get_y()][box.get_x()] = 'R';
-                } else {
-                    result[box.get_y()][box.get_x()] = 'B';
-                }
-            }
-            result[player.get_y()][player.get_x()] = 'S';
-            return result;
-        }
-    
-        
-    private:
-        // std::vector<coordinate> boxes;
-        // coordinate player;
-        data info;
-        std::bitset<2> direction; // 00: up, 01: down, 10: left, 11: right
-        bool pushed;
-
-        // struct CoordinateHash {
-        //     std::size_t operator()(const coordinate& coord) const {
-        //         return std::hash<uint16_t>()(coord.get_x()) ^ (std::hash<uint16_t>()(coord.get_y()) << 1);
-        //     }
-        // };
-
-        void set_direction(char d) {
-            switch (d) {
-                case 'U':
-                    this->direction = std::bitset<2>(0);
-                    break;
-                case 'D':
-                    this->direction = std::bitset<2>(1);
-                    break;
-                case 'L':
-                    this->direction = std::bitset<2>(2);
-                    break;
-                case 'R':
-                    this->direction = std::bitset<2>(3);
-                    break;
-                default:
-                    break;
-            }
-        }
-
-        char get_direction(const std::bitset<2> &dir) {
-            switch (dir.to_ulong()) {
-                case 0:
-                    return 'U';
-                case 1:
-                    return 'D';
-                case 2:
-                    return 'L';
-                case 3:
-                    return 'R';
-                default:
-                    return 'X';
-            }
-        }
-
-
-        state move_back(const std::bitset<2> &d, bool with_box) {
-            state result = *this;
-            coordinate check_box = coordinate(result.info.get_player().get_x(), result.info.get_player().get_y());
-            switch (d.to_ulong()) {
-                case 0:
-                    result.info.set_player(result.info.get_player().lower());
-                    check_box = check_box.upper();
-                    break;
-                case 1:
-                    result.info.set_player(result.info.get_player().upper());
-                    check_box = check_box.lower();
-                    break;
-                case 2:
-                    result.info.set_player(result.info.get_player().right());
-                    check_box = check_box.left();
-                    break;
-                case 3:
-                    result.info.set_player(result.info.get_player().left());
-                    check_box = check_box.right();
-                    break;
-                default:
-                    break;
-            }
-
-            if (with_box) {
-                std::vector<coordinate> boxes = result.info.get_boxes();
-                for (auto& box : boxes) {
-                    if (box.get_x() == check_box.get_x() && box.get_y() == check_box.get_y()) {
-                        switch (d.to_ulong()) {
-                            case 0:
-                                box = box.lower();
-                                break;
-                            case 1:
-                                box = box.upper();
-                                break;
-                            case 2:
-                                box = box.right();
-                                break;
-                            case 3:
-                                box = box.left();
-                                break;
-                            default:
-                                break;
-                        }
-                    }
-                }
-                result.info.set_boxes(boxes);
-            }
-
-            return result;
-        }
-
-            
-};
+vector<string> fill_deadzones(const std::vector<std::string>& grid);
 
 /**
  * @brief  Read your map from stdin
@@ -509,6 +28,322 @@ void read_map(std::vector<std::string> &grid) {
     }
 }
 
+class state {
+    public:
+        state() : coordinates(bitset<72>()), direction(bitset<2>()), pushed() {}
+
+        state(const state &other) : coordinates(other.coordinates), direction(other.direction), pushed(other.pushed) {}
+
+        state &operator=(const state &other) {
+            coordinates = other.coordinates;
+            direction = other.direction;
+            pushed = other.pushed;
+            return *this;
+        }
+
+        bool operator==(const state &other) const {
+            return coordinates == other.coordinates;
+        }
+
+        bool operator!=(const state &other) const {
+            return !(*this == other);
+        }
+
+        void init(std::vector<std::string> &grid) {
+            coordinates.reset();
+            pushed = false;
+            set_direction('R');
+            uint16_t rows = (uint16_t) grid.size();
+            uint16_t cols = (uint16_t) grid[0].size();
+            grid_size = cols;
+            size_t box_number = 0;
+            for (uint16_t i = 0; i < rows; ++i) {
+                for (uint16_t j = 0; j < cols; ++j) {
+                    if (grid[i][j] == 'B' ) {
+                        set_box(box_number++, j, i);
+                        grid[i][j] = '.';
+                    }
+                    if (grid[i][j] == 'S') {
+                        set_player(j, i);
+                        grid[i][j] = '.';
+                    }
+                    if (grid[i][j] == 'R') {
+                        set_box(box_number++, j, i);
+                        grid[i][j] = 'T';
+                    }
+                }
+            }
+        }
+
+        state move (const std::vector<std::string> &grid, char d) {
+            state result = *this;
+            coordinate current_player = get_player();
+            result.set_direction(d);
+            result.pushed = false;
+            switch (d) {
+                case 'D':
+                    result.set_player(current_player.x, current_player.y + 1);
+                    break;
+                case 'U':
+                    result.set_player(current_player.x, current_player.y - 1);
+                    break;
+                case 'L':
+                    result.set_player(current_player.x - 1, current_player.y);
+                    break;
+                case 'R':
+                    result.set_player(current_player.x + 1, current_player.y);
+                    break;
+                default:
+                    result.set_player(current_player.x, current_player.y);
+                    break;
+            }
+
+            current_player = result.get_player();
+
+            if (grid[current_player.y][current_player.x] == '#') {
+                return *this; // Wall, do nothing
+            }
+            
+            for (size_t i = 0; i < 8; ++i) {
+                coordinate box = get_box(i);
+                if (box.x == 0 || box.y == 0) break;
+                if (box.x == current_player.x && box.y == current_player.y) {
+                    result.pushed = true;
+                    switch (d) {
+                        case 'D':
+                            result.set_box(i, current_player.x, current_player.y + 1);
+                            break;
+                        case 'U':
+                            result.set_box(i, current_player.x, current_player.y - 1);
+                            break;
+                        case 'L':
+                            result.set_box(i, current_player.x - 1, current_player.y);
+                            break;
+                        case 'R':
+                            result.set_box(i, current_player.x + 1, current_player.y);
+                            break;
+                        default:
+                            result.set_box(i, current_player.x, current_player.y);
+                            break;
+                    }
+
+                    coordinate new_box = result.get_box(i);
+                    if (grid[new_box.y][new_box.x] == '#') {
+                        return *this; // Wall behind the box
+                    }
+
+                    // Check for another box on the way
+                    for (size_t j = 0; j < 8; ++j) {
+                        if (i == j) continue;
+                        coordinate other_box = result.get_box(j);
+                        if (other_box.x == 0 || other_box.y == 0) break;
+                        if (other_box.x == new_box.x && other_box.y == new_box.y) {
+                            return *this; // Another box is in the way
+                        }
+                    }
+                }
+            }
+            return result;
+        }
+
+        bool check_win(const std::vector<std::string> &grid) {
+            for (size_t i = 0; i < 8; ++i) {
+                coordinate box = get_box(i);
+                if (box.x == 0 || box.y == 0) break;
+                if (grid[box.y][box.x] != 'T') {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        bool check_deadlock(const std::vector<std::string> &grid) {
+            for (size_t i = 0; i < 8; ++i) {
+                coordinate box = get_box(i);
+                if (box.x == 0 || box.y == 0) break;
+                if (grid[box.y][box.x] == 'T') continue;
+                
+                // Check if there's a box on a corner
+                bool top_wall = (grid[box.y - 1][box.x] == '#');
+                bool bottom_wall = (grid[box.y + 1][box.x] == '#');
+                bool left_wall = (grid[box.y][box.x - 1] == '#');
+                bool right_wall = (grid[box.y][box.x + 1] == '#');
+
+                if ((top_wall || bottom_wall) && (left_wall || right_wall)) {
+                    return true; // Box is in a corner
+                }
+            }
+            return false;
+        }
+
+        bool visit(std::unordered_map<std::bitset<72>, std::bitset<3>> &visited) {
+            if (visited.find(coordinates) != visited.end()) {
+                return false; // Already visited
+            } else {
+                bitset<3> value;
+                value.set(0, direction[0]);
+                value.set(1, direction[1]);
+                value.set(2, pushed);
+                visited.insert({coordinates, value});
+                return true;
+            }
+        }
+
+        string get_path(unordered_map<std::bitset<72>, std::bitset<3>> &visited, state start) {
+            string path = "";
+            state current = *this;
+            bitset<3> value;
+            while (current != start) {
+                value = visited[current.coordinates];
+                current.direction.set(0, value[0]);
+                current.direction.set(1, value[1]);
+                path += current.get_direction();
+                current.pushed = value[2];
+                current = current.move_back();
+            }
+            // Reverse the path
+            std::reverse(path.begin(), path.end());
+            return path;
+        }
+    
+        vector<string> get_grid(const vector<string> &grid) {
+            vector<string> result = grid;
+            coordinate player = get_player();
+            result[player.y][player.x] = 'S';
+            for (size_t i = 0; i < 8; ++i) {
+                coordinate box = get_box(i);
+                if (box.x == 0 || box.y == 0) break;
+                result[box.y][box.x] = 'B';
+                if (grid[box.y][box.x] == 'T') {
+                    result[box.y][box.x] = 'R';
+                }
+            }
+            return result;
+        }
+    
+    private:
+        bitset<72> coordinates;
+        bitset<2> direction; // 0: up, 1: down, 2: left, 3: right
+        bool pushed = false;
+
+        
+        struct coordinate {
+            size_t x;
+            size_t y;
+        };
+
+        coordinate get_player() const {
+            coordinate result;
+            size_t index = coordinates.to_ullong() & 0xFF;
+            result.x = index % grid_size;
+            result.y = index / grid_size;
+            return result;
+        }
+
+        coordinate get_box(size_t i) {
+            coordinate result;
+            size_t index = (coordinates >> ((i + 1) * 8)).to_ullong() & 0xFF;
+            result.x = index % grid_size;
+            result.y = index / grid_size;
+            return result;
+        }
+
+        void set_player(size_t x, size_t y) {
+            size_t index = y * grid_size + x;
+            coordinates &= ~(std::bitset<72>(0xFF)); // Mask to clear the last 8 bits
+            coordinates |= std::bitset<72>(index);
+        }
+
+        void set_box(size_t i, size_t x, size_t y) {
+            if (i >= 8) {
+                throw out_of_range("Index out of range");
+            }
+            size_t index = y * grid_size + x;
+            coordinates &= ~(std::bitset<72>(0xFF) << ((i + 1) * 8)); // Mask to clear 8 bits
+            coordinates |= (std::bitset<72>(index) << ((i + 1) * 8));
+        }
+
+        void set_direction(char d) {
+            switch (d) {
+                case 'U':
+                    direction = 0;
+                    break;
+                case 'D':
+                    direction = 1;
+                    break;
+                case 'L':
+                    direction = 2;
+                    break;
+                case 'R':
+                    direction = 3;
+                    break;
+                default:
+                    direction.reset();
+                    break;
+            }
+        }
+
+
+        char get_direction() {
+            switch (direction.to_ulong()) {
+                case 0:
+                    return 'U';
+                case 1:
+                    return 'D';
+                case 2:
+                    return 'L';
+                case 3:
+                    return 'R';
+                default:
+                    return 'X';
+            }
+        }
+
+        state move_back() {
+            state result = *this;
+            coordinate current_player = get_player();
+            coordinate box_location;
+            char d = get_direction();
+            switch (d) {
+                case 'U':
+                    result.set_player(current_player.x, current_player.y + 1);
+                    box_location.x = current_player.x;
+                    box_location.y = current_player.y - 1;
+                    break;
+                case 'D':
+                    result.set_player(current_player.x, current_player.y - 1);
+                    box_location.x = current_player.x;
+                    box_location.y = current_player.y + 1;
+                    break;
+                case 'L':
+                    result.set_player(current_player.x + 1, current_player.y);
+                    box_location.x = current_player.x - 1;
+                    box_location.y = current_player.y;
+                    break;
+                case 'R':
+                    result.set_player(current_player.x - 1, current_player.y);
+                    box_location.x = current_player.x + 1;
+                    box_location.y = current_player.y;
+                    break;
+                default:
+                    break;
+            }
+
+            if (pushed) {
+                for (size_t i = 0; i < 8; ++i) {
+                    coordinate box = get_box(i);
+                    if (box.x == 0 || box.y == 0) break;
+                    if (box.x == box_location.x && box.y == box_location.y) {
+                        result.set_box(i, current_player.x, current_player.y);
+                    }
+                }
+            }
+            return result;
+        }
+
+        
+};
+
 /**
  * @brief  Solve the sokoban described by the grid
  * @note   Output string format: See project description
@@ -519,27 +354,31 @@ std::string solve(std::vector<std::string> &grid){
     if (check_invalid(grid)) {
         return "No solution!";
     }
-    state s(grid);
-    if (s.check_solved(grid)) {
+    state s, initial_state;
+    vector<string> grid_copy = fill_deadzones(grid);
+    s.init(grid_copy);
+    if (s.check_win(grid_copy)) {
         return "";
     }
+    initial_state = s;
     std::unordered_map<std::bitset<72>, std::bitset<3>> visited;
     std::queue<state> q;
     q.push(s);
     while (!q.empty()) {
-        
-        
         state current_state = q.front();
         q.pop();
 
         if (current_state.visit(visited)) {
-            for (char direction : "DRUL") {
-                state new_state = current_state.move(grid, direction);
-                if (new_state.check_solved(grid)) {
-                    new_state.visit(visited);
-                    return new_state.get_path(visited);
+            for (char direction : "RDLU") {
+                if (direction == '\0') {
+                    break;
                 }
-                if (!new_state.check_deadlock(grid)) {
+                state new_state = current_state.move(grid_copy, direction);
+                if (new_state.check_win(grid_copy)) {
+                    new_state.visit(visited);
+                    return new_state.get_path(visited, initial_state);
+                }
+                if (!new_state.check_deadlock(grid_copy)) {
                     q.push(new_state);
                 }
             }
@@ -555,20 +394,15 @@ std::string solve(std::vector<std::string> &grid){
 const std::vector<std::string> answers = {
     "__leave_this_blank__", 
     "ans for big 1",
-    "LLRDDLLUULUUURRDLDUURRRDLLULLDDRUDDDURRRU",
-    "DRUUUULUURDRRURDDDRDLDDRLULRUULD",
-    "RRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRR",
+    "ans for big 2",
+    "ans for big 3",
+    "ans for big 4",
     "ans for big 5",
-    "LRURURULUULLDRURRDLDDRUDDDLLLLURUURUL",
+    "ans for big 6",
     "ans for big 7",
-    "ULDDDRDLLLLUURDLDRUUDDRRULDLU",
-    "RDDDDUULLLDDLLURDRRRDRLRUULULLDLDRRLUURRDD",
-    "LLLDDLRRRRRUUUULDDDRDLLLLULURUULURDRR",
-    "ans for big 11",
-    "ans for big 12",
-    "ans for big 13",
-    "ans for big 14",
-    "ans for big 15"
+    "ans for big 8",
+    "ans for big 9",
+    "ans for big 10"
 };
 
 // Don't modify this.
@@ -614,17 +448,42 @@ bool check_invalid(const std::vector<std::string>& grid) {
                 if ((top_wall || bottom_wall) && (left_wall || right_wall)) {
                     return true;
                 }
+            }
 
-                // Check for box against two walls in a T-junction
-                if ((top_wall && left_wall && grid[i-1][j-1] == '#') || 
-                    (top_wall && right_wall && grid[i-1][j+1] == '#') ||
-                    (bottom_wall && left_wall && grid[i+1][j-1] == '#') ||
-                    (bottom_wall && right_wall && grid[i+1][j+1] == '#')) {
-                        return true;
-                    }
+            // Check for isolated target
+            if (grid[i][j] == 'T') {
+                bool top_wall = (grid[i-1][j] == '#');
+                bool bottom_wall = (grid[i+1][j] == '#');
+                bool left_wall = (grid[i][j-1] == '#');
+                bool right_wall = (grid[i][j+1] == '#');
+                if (top_wall && bottom_wall && left_wall && right_wall) return true;
             }
         }
     }
 
+
     return false;
+}
+
+vector<string> fill_deadzones(const std::vector<std::string>& grid) {
+    vector<string> result = grid;
+    unsigned long rows = (unsigned long) grid.size();
+    unsigned long cols = (unsigned long) grid[0].size();
+    for (unsigned long i = 0; i < rows; ++i) {
+        for (unsigned long j = 0; j < cols; ++j) {
+            if (grid[i][j] == '.') {
+                int count = 0;
+                if (grid[i-1][j] == '#') count++;
+                if (grid[i+1][j] == '#') count++;
+                if (grid[i][j-1] == '#') count++;
+                if (grid[i][j+1] == '#') count++;
+                if (count >= 3) result[i][j] = '#';
+            }
+        }
+    }
+    
+    if (result != grid) {
+        result = fill_deadzones(result);
+    }
+    return result;
 }
