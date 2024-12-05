@@ -28,6 +28,7 @@ void read_map(std::vector<std::string> &grid) {
     }
 }
 
+// @brief  The state of the sokoban
 class state {
     public:
         state() : coordinates(bitset<72>()), direction(bitset<2>()), pushed() {}
@@ -49,6 +50,12 @@ class state {
             return !(*this == other);
         }
 
+        /**
+         * @brief  Initialize a state with a grid
+         * @param  &grid: The grid of the Sokoban
+         * @note   The grid is modified during the process
+         * @retval None
+         */
         void init(std::vector<std::string> &grid) {
             coordinates.reset();
             pushed = false;
@@ -75,6 +82,14 @@ class state {
             }
         }
 
+        /**
+         * @brief  Move to a new state
+         * @param  &grid: The Sokoban grid
+         * @param  d: The direction to move
+         * @note   This function does not check if the move is valid.
+         *         It will return the same state if the move is invalid.
+         * @retval The new state
+         */
         state move (const std::vector<std::string> &grid, char d) {
             state result = *this;
             coordinate current_player = get_player();
@@ -157,25 +172,41 @@ class state {
             return true;
         }
 
+        /**
+         * @brief  Check if the state is a deadlock
+         * @param  &grid: The Sokoban grid
+         * @retval True if the state is a deadlock, otherwise false
+         * @note   A deadlock is a state where a box is in a 2x2 square with no open space
+         */
         bool check_deadlock(const std::vector<std::string> &grid) {
-            for (size_t i = 0; i < 8; ++i) {
-                coordinate box = get_box(i);
-                if (box.x == 0 || box.y == 0) break;
-                if (grid[box.y][box.x] == 'T') continue;
-                
-                // Check if there's a box on a corner
-                bool top_wall = (grid[box.y - 1][box.x] == '#');
-                bool bottom_wall = (grid[box.y + 1][box.x] == '#');
-                bool left_wall = (grid[box.y][box.x - 1] == '#');
-                bool right_wall = (grid[box.y][box.x + 1] == '#');
+            vector<string> temp_grid = get_grid(grid);
 
-                if ((top_wall || bottom_wall) && (left_wall || right_wall)) {
-                    return true; // Box is in a corner
+            for (size_t i = 0; i < temp_grid.size() - 1; ++i) {
+                for (size_t j = 0; j < temp_grid[i].size() - 1; ++j) {
+                    bool has_open_space = false;
+                    bool has_box = false;
+                    for (size_t x = 0; x < 2; ++x) {
+                        for (size_t y = 0; y < 2; ++y) {
+                            char c = temp_grid[i + y][j + x];
+                            has_open_space |= (c == '.' || c == 'T' || c == 'S');
+                            has_box |= (c == 'B');
+                        }
+                    }
+                    if (has_box && !has_open_space) {
+                        return true; // Box is in a 2x2 square with no open space
+                    }
                 }
             }
+
             return false;
         }
 
+        /**
+         * @brief  Mark a state as visited
+         * @param  &visited: The set of visited states
+         * @retval True if the state was not visited before, false otherwise
+         * @note   The state is identified by its coordinates and direction
+         */
         bool visit(std::unordered_map<std::bitset<72>, std::bitset<3>> &visited) {
             if (visited.find(coordinates) != visited.end()) {
                 return false; // Already visited
@@ -189,7 +220,15 @@ class state {
             }
         }
 
-        string get_path(unordered_map<std::bitset<72>, std::bitset<3>> &visited, state start) {
+        /**
+         * @brief  Get the path from the start state to the current state
+         * @param  &visited: The set of visited states
+         * @param  &start: The start state
+         * @retval The path from the start state to the current state
+         * @note   The path is a sequence of characters, each character is a direction
+         *         ('D', 'U', 'L', 'R')
+         */
+        string get_path(unordered_map<std::bitset<72>, std::bitset<3>> &visited, state &start) {
             string path = "";
             state current = *this;
             bitset<3> value;
@@ -206,6 +245,14 @@ class state {
             return path;
         }
     
+        /**
+         * @brief  Get a grid representation of the state
+         * @param  &grid: The original Sokoban grid without player and boxes
+         * @retval A grid representation of the state
+         * @note   The player is represented by 'S', boxes are represented by 'B',
+         *         boxes on targets are represented by 'R', walls are represented by
+         *         '#', and empty spaces are represented by '.'
+         */
         vector<string> get_grid(const vector<string> &grid) {
             vector<string> result = grid;
             coordinate player = get_player();
@@ -232,6 +279,10 @@ class state {
             size_t y;
         };
 
+        /**
+         * @brief  Get the player's position
+         * @retval The player's position as a coordinate
+         */
         coordinate get_player() const {
             coordinate result;
             size_t index = coordinates.to_ullong() & 0xFF;
@@ -240,6 +291,12 @@ class state {
             return result;
         }
 
+        /**
+         * @brief  Get the box at index i
+         * @param  i: The box index
+         * @retval The box at index i as a coordinate
+         * @pre    i < 8
+         */
         coordinate get_box(size_t i) {
             coordinate result;
             size_t index = (coordinates >> ((i + 1) * 8)).to_ullong() & 0xFF;
@@ -248,12 +305,26 @@ class state {
             return result;
         }
 
+        /**
+         * @brief  Set the player's position
+         * @param  x: The x position
+         * @param  y: The y position
+         * @note   The position is stored in the last 8 bits of the coordinates field
+         */
         void set_player(size_t x, size_t y) {
             size_t index = y * grid_size + x;
             coordinates &= ~(std::bitset<72>(0xFF)); // Mask to clear the last 8 bits
             coordinates |= std::bitset<72>(index);
         }
-
+        
+        /**
+         * @brief  Set the box at index i
+         * @param  i: The box index
+         * @param  x: The x position
+         * @param  y: The y position
+         * @throw  out_of_range if i >= 8
+         * @note   The position is stored in the 8 bits starting at (i + 1) * 8
+         */
         void set_box(size_t i, size_t x, size_t y) {
             if (i >= 8) {
                 throw out_of_range("Index out of range");
@@ -299,6 +370,12 @@ class state {
             }
         }
 
+        /**
+         * @brief  Move back to the previous state
+         * @retval The previous state
+         * @note   If the player was pushing a box, the box is moved back to its
+         *         previous position
+         */
         state move_back() {
             state result = *this;
             coordinate current_player = get_player();
@@ -413,6 +490,17 @@ std::string print_answer(int index) {
     return answers[(size_t)index];
 }
 
+/**
+ * @brief  Check if the given Sokoban map is invalid.
+ * @details
+ *   The map is invalid if:
+ *   - There are more or less than one starts (S).
+ *   - The number of boxes is more than the number of targets.
+ *   - There is a box in a corner (i.e. it is surrounded by walls).
+ *   - There is a target that is isolated (i.e. it is surrounded by walls).
+ * @param  grid: The Sokoban map as a vector of strings.
+ * @retval true if the map is invalid, false otherwise.
+ */
 bool check_invalid(const std::vector<std::string>& grid) {
     unsigned long rows = (unsigned long) grid.size();
     unsigned long cols = (unsigned long) grid[0].size();
