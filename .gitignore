@@ -4,4 +4,6 @@ a
 log.txt
 *.zip
 *.out
+out
 ibr/
+sokoban

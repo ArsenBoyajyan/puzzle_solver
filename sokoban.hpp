@@ -31,7 +31,7 @@ void read_map(std::vector<std::string> &grid) {
 // @brief  The state of the sokoban
 class state {
     public:
-        state() : coordinates(bitset<72>()), direction(bitset<2>()), pushed() {}
+        state() : coordinates(bitset<64>()), direction(bitset<2>()), pushed() {}
 
         state(const state &other) : coordinates(other.coordinates), direction(other.direction), pushed(other.pushed) {}
 
@@ -207,7 +207,7 @@ class state {
          * @retval True if the state was not visited before, false otherwise
          * @note   The state is identified by its coordinates and direction
          */
-        bool visit(std::unordered_map<std::bitset<72>, std::bitset<3>> &visited) {
+        bool visit(std::unordered_map<std::bitset<64>, std::bitset<3>> &visited) {
             if (visited.find(coordinates) != visited.end()) {
                 return false; // Already visited
             } else {
@@ -228,7 +228,7 @@ class state {
          * @note   The path is a sequence of characters, each character is a direction
          *         ('D', 'U', 'L', 'R')
          */
-        string get_path(unordered_map<std::bitset<72>, std::bitset<3>> &visited, state &start) {
+        string get_path(unordered_map<std::bitset<64>, std::bitset<3>> &visited, state &start) {
             string path = "";
             state current = *this;
             bitset<3> value;
@@ -269,7 +269,7 @@ class state {
         }
     
     private:
-        bitset<72> coordinates;
+        bitset<64> coordinates;
         bitset<2> direction; // 0: up, 1: down, 2: left, 3: right
         bool pushed = false;
 
@@ -313,8 +313,8 @@ class state {
          */
         void set_player(size_t x, size_t y) {
             size_t index = y * grid_size + x;
-            coordinates &= ~(std::bitset<72>(0xFF)); // Mask to clear the last 8 bits
-            coordinates |= std::bitset<72>(index);
+            coordinates &= ~(std::bitset<64>(0xFF)); // Mask to clear the last 8 bits
+            coordinates |= std::bitset<64>(index);
         }
         
         /**
@@ -330,8 +330,8 @@ class state {
                 throw out_of_range("Index out of range");
             }
             size_t index = y * grid_size + x;
-            coordinates &= ~(std::bitset<72>(0xFF) << ((i + 1) * 8)); // Mask to clear 8 bits
-            coordinates |= (std::bitset<72>(index) << ((i + 1) * 8));
+            coordinates &= ~(std::bitset<64>(0xFF) << ((i + 1) * 8)); // Mask to clear 8 bits
+            coordinates |= (std::bitset<64>(index) << ((i + 1) * 8));
         }
 
         void set_direction(char d) {
@@ -403,6 +403,9 @@ class state {
                     box_location.y = current_player.y;
                     break;
                 default:
+                    result.set_player(current_player.x - 1, current_player.y);
+                    box_location.x = current_player.x + 1;
+                    box_location.y = current_player.y;
                     break;
             }
 
@@ -438,7 +441,7 @@ std::string solve(std::vector<std::string> &grid){
         return "";
     }
     initial_state = s;
-    std::unordered_map<std::bitset<72>, std::bitset<3>> visited;
+    std::unordered_map<std::bitset<64>, std::bitset<3>> visited;
     std::queue<state> q;
     q.push(s);
     while (!q.empty()) {
@@ -470,16 +473,21 @@ std::string solve(std::vector<std::string> &grid){
 // Your answer should look like "UUDDLLRR..."
 const std::vector<std::string> answers = {
     "__leave_this_blank__", 
-    "ans for big 1",
-    "ans for big 2",
-    "ans for big 3",
-    "ans for big 4",
-    "ans for big 5",
-    "ans for big 6",
-    "ans for big 7",
-    "ans for big 8",
-    "ans for big 9",
-    "ans for big 10"
+    "UUUULLULLULDRDLLLLLLLLURRULLLLRDRDDLULDLULDDDDLDRRRRRDLDDRRDRDDDRRRRDRRULLLRDDDLLUUURULLDLUUULURRR",
+    "No solution!",
+    "DRURRLLUUULUURDRRRDDDRRDDLLUURRUURRUULLDDDDLLDDRRURULDDLLULLLUUULUURDRRRRLDDRRDDDLLULLLUUULURRRRDDRRDDDLLDLURRRUUULLDDUUUULLLDDDDRRDRUUURRDDDLRUUUURRUULLDLLLLRRRRDDLLUDDDLDDRUUUURRDLULDDLDDRURRURULULLDDLDRUUURRUULLDDDDLLLUUULUURDRRURDDDDULDDLLUUULURRRURDRRDDDLLULDURRRUULLDDRDL",
+    "RRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRRLLLLDDRRRR",
+    "No solution!",
+    "LLURUUDDDRRUUULULDDDRDLRRUURULU",
+    "No solution!",
+    "No solution!",
+    "RDDLLLDDLLURDRRRDRUULULLDLDRRLUURRDRDDLULLLLUUUUUURRDDDDDLDRRRURDUUUULUURDDDDLDDLLLLUUUUURURDDDDDLDRRRLLLLUUURLUURRDDDDLDRRLUURRDD",
+    "DDRUUUULDDDRDLLLRRUULLLULDDUUUURLDDRURR",
+    "No solution!",
+    "No solution!",
+    "No solution!",
+    "No solution!",
+    "No solution!"
 };
 
 // Don't modify this.
